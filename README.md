@@ -1,17 +1,94 @@
 # Axon
 
-Axon is a networked coding-agent harness built from a vendored OpenCode base and shaped to interoperate with Engram, Claude Code, and Codex.
+A networked coding-agent harness built on [OpenCode](https://github.com/anomalyco/opencode), designed to peer with Claude Code and Codex on a shared [Engram](https://github.com/dblmca/engram) memory and coordination plane.
 
-Axon should stay model-agnostic. The first deployment target can be a local `qwen3.6`, but provider and model selection should come from runtime configuration rather than repo-level assumptions or hardwired plugin logic.
+Model-agnostic by design. The first deployment target is a local Qwen3.6-35B, but provider and model selection come from runtime profiles, not hardwired code.
 
-The current direction is deliberate:
+## What It Does
 
-- keep the OpenCode-derived runtime, agent loop, and UI in this repo
-- keep Engram as the shared memory and coordination plane on the network
-- preserve MCP and server interoperability instead of cloning Engram locally
+Axon gives any LLM the same collaborative infrastructure that Claude Code agents use:
 
-The current architectural plan lives in [docs/architecture.md](/home/mmca/projects/axon/docs/architecture.md).
+- **Shared memory** — sessions, observations, and decisions persist in Engram across all agents
+- **Agent identity** — registers on the Engram agent network with heartbeat, inbox, and capability discovery
+- **Cross-agent coordination** — tasks, orchestration graphs, channels, file locks, and context windows
+- **MCP interop** — consumes the same MCP tool surface as Claude Code and Codex
 
-The first Axon-specific implementation slice currently lives in [opencode/.opencode/plugin/axon-engram.js](/home/mmca/projects/axon/opencode/.opencode/plugin/axon-engram.js).
+## Quick Start
 
-The first concrete deployment/bootstrap path lives in [docs/runtime-bootstrap.md](/home/mmca/projects/axon/docs/runtime-bootstrap.md), with the profile at [profiles/axon.vector-qwen-engram.jsonc](/home/mmca/projects/axon/profiles/axon.vector-qwen-engram.jsonc), launcher at [scripts/run-vector-qwen.sh](/home/mmca/projects/axon/scripts/run-vector-qwen.sh), and smoke check at [scripts/smoke-vector-qwen.sh](/home/mmca/projects/axon/scripts/smoke-vector-qwen.sh).
+```bash
+# Smoke test (Qwen endpoint + Engram + MCP + tool round-trip)
+scripts/smoke-vector-qwen.sh
+
+# Launch interactive session
+ENGRAM_API_KEY=... scripts/run-vector-qwen.sh
+```
+
+Requires `bun` and a running Engram server.
+
+## Architecture
+
+```
+Axon (this repo)                    Engram (network)
++-----------------------+           +------------------------+
+|  OpenCode runtime     |           |  Memory + retrieval    |
+|  Agent loop + TUI     |<---MCP--->|  Agent registry        |
+|  axon-engram plugin   |           |  Tasks + orchestrator  |
+|  Deployment profiles  |           |  Channels + locks      |
++-----------------------+           +------------------------+
+```
+
+Three integration layers:
+
+| Layer | Direction | Purpose |
+|-------|-----------|---------|
+| **Capture** | Axon -> Engram | Session lifecycle, agent registration, prompt/tool observation capture |
+| **Context** | Engram -> Axon | Startup context, decisions, inbox previews injected into system prompt |
+| **Tooling** | Bidirectional | MCP tools used directly (`engram_search`, `engram_task`, `engram_inbox`, etc.) |
+
+**Boundary rule:** Axon consumes Engram as an external service. It never recreates memory, coordination, or retrieval locally.
+
+Full architecture doc: [docs/architecture.md](docs/architecture.md)
+
+## Key Files
+
+| File | What |
+|------|------|
+| `opencode/.opencode/plugin/axon-engram.js` | Core plugin — session init, capture, context injection |
+| `profiles/axon.vector-qwen-engram.jsonc` | Deployment profile — provider, tools, permissions, MCP config |
+| `scripts/run-vector-qwen.sh` | Launcher — injects profile via `OPENCODE_CONFIG_CONTENT` |
+| `scripts/smoke-vector-qwen.sh` | Smoke test — validates full stack end-to-end |
+| `docs/architecture.md` | Architecture plan and boundary rules |
+| `docs/runtime-bootstrap.md` | Deployment walkthrough and env var reference |
+
+## Deployment Profiles
+
+Profiles live in `profiles/` as `.jsonc` files. The launcher injects the active profile via `OPENCODE_CONFIG_CONTENT`, keeping the repo-level OpenCode config neutral.
+
+The default profile targets a local Qwen3.6-35B on the Vector server with thinking disabled (more reliable tool-calling via llama.cpp). To add a new target, create a new profile and launcher script.
+
+| Variable | Default |
+|----------|---------|
+| `ENGRAM_API_KEY` | *(required)* |
+| `AXON_QWEN_BASE_URL` | `http://192.168.1.153:8081/v1` |
+| `AXON_QWEN_MODEL_ID` | `Qwen3.6-35B-A3B-abliterated-Q4_K_M.gguf` |
+| `ENGRAM_WORKER_URL` | `http://localhost:37779` |
+
+## Upstream
+
+OpenCode vendored from [`anomalyco/opencode`](https://github.com/anomalyco/opencode) `dev` branch. See [UPSTREAM.md](UPSTREAM.md) for provenance and tracking commands.
+
+## How This Was Built
+
+Axon was bootstrapped by a team of AI agents coordinated through Engram's task orchestrator.
+
+A human defined the project intent and architecture boundaries, then dispatched work as orchestrated task graphs. Four Claude Code agents — running in parallel tmux sessions — picked up tasks, executed them, and reported completion back through the Engram coordination plane. The orchestrator handled dependency ordering, dispatch, stall detection, and graph completion tracking.
+
+The first sprint (initial commit, plugin audit, CLAUDE.md, smoke test verification) ran as a single graph with a sequential gate on the initial commit followed by three parallel tasks. The second sprint (system-message fix, codebase investigation, subagent guidance, gap tracker) ran fully parallel.
+
+Along the way, bugs in the orchestrator itself were found and fixed: idle detection that couldn't see past the Claude Code status bar, dispatch messages that didn't tell agents how to close their tasks, reminder dedup races, and a schema constraint that silently blocked a message type.
+
+The agents that built Axon are the same kind of agents Axon is designed to run.
+
+## License
+
+See [opencode/LICENSE](opencode/LICENSE) for the vendored OpenCode license.
