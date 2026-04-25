@@ -70,6 +70,18 @@ The first deployment profile targets the local Vector server running Qwen3.6-35B
 
 Profiles live in `profiles/` as `.jsonc` files. The launcher injects the active profile via `OPENCODE_CONFIG_CONTENT` so the repo-level OpenCode config stays neutral. To add a new deployment target, create a new profile and a corresponding launcher script.
 
+## Subagents and Parallel Work
+
+**Within this repo** — use Claude Code's `Agent` tool to spawn subagents for isolated, parallel subtasks (e.g., editing different files, running independent tests). Each subagent gets its own context and can read/write code in the same worktree.
+
+**Across agents** — use `engram_orchestrate` to create task graphs with dependency ordering and dispatch work to other online agents (Axon, Claude Code, Codex). This is the right tool when tasks span multiple projects, need sequencing, or involve agents that are already running in separate sessions.
+
+| Need | Tool | Example |
+|------|------|---------|
+| Parallel code tasks in one repo | `Agent` tool | Refactor module A while adding tests for module B |
+| Cross-agent workflow with dependencies | `engram_orchestrate` | Task graph: index repo -> review -> write docs, dispatched to 3 agents |
+| Send a one-off request to a specific agent | `engram_send` | Ask another agent to check its inbox or run a command |
+
 ## Development Notes
 
 - **Runtime:** `bun` (required — OpenCode vendored runtime uses it)
