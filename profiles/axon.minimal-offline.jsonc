@@ -1,0 +1,52 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Offline mode: local Qwen only, no Engram, no MCP servers.
+  // For quick local coding without network dependencies.
+  "enabled_providers": ["vector-qwen"],
+  "model": "vector-qwen/{env:AXON_QWEN_MODEL_ID}",
+  "small_model": "vector-qwen/{env:AXON_QWEN_MODEL_ID}",
+
+  "provider": {
+    "vector-qwen": {
+      "name": "Vector Qwen3.6",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "{env:AXON_QWEN_BASE_URL}",
+        "timeout": 300000
+      },
+      "models": {
+        "{env:AXON_QWEN_MODEL_ID}": {
+          "name": "Qwen3.6-35B-A3B-abliterated-Q4_K_M",
+          "family": "qwen",
+          "attachment": true,
+          "reasoning": true,
+          "temperature": true,
+          "tool_call": true,
+          "options": {
+            "chat_template_kwargs": {
+              "enable_thinking": false
+            }
+          },
+          "limit": {
+            "context": 262144,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        }
+      }
+    }
+  },
+
+  "tools": {
+    "task": false,
+    "skill": false,
+    "todowrite": false,
+    "webfetch": false,
+    "websearch": false,
+    "codesearch": false
+  }
+}

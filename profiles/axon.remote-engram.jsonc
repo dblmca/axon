@@ -1,0 +1,95 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Vector Qwen model with Engram on a remote host.
+  // Set ENGRAM_WORKER_URL to the remote Engram instance (no localhost default).
+  "enabled_providers": ["vector-qwen"],
+  "model": "vector-qwen/{env:AXON_QWEN_MODEL_ID}",
+  "small_model": "vector-qwen/{env:AXON_QWEN_MODEL_ID}",
+
+  "provider": {
+    "vector-qwen": {
+      "name": "Vector Qwen3.6",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "{env:AXON_QWEN_BASE_URL}",
+        "timeout": 300000
+      },
+      "models": {
+        "{env:AXON_QWEN_MODEL_ID}": {
+          "name": "Qwen3.6-35B-A3B-abliterated-Q4_K_M",
+          "family": "qwen",
+          "attachment": true,
+          "reasoning": true,
+          "temperature": true,
+          "tool_call": true,
+          "options": {
+            "chat_template_kwargs": {
+              "enable_thinking": false
+            }
+          },
+          "limit": {
+            "context": 262144,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        }
+      }
+    }
+  },
+
+  "tools": {
+    "task": false,
+    "skill": false,
+    "todowrite": false,
+    "webfetch": false,
+    "websearch": false,
+    "codesearch": false
+  },
+
+  "permission": {
+    "agentic-mcp_*": "deny",
+
+    "engram_*": "deny",
+    "engram_status": "allow",
+    "engram_search": "allow",
+    "engram_recall": "allow",
+    "engram_context": "allow",
+    "engram_decisions": "allow",
+    "engram_note": "allow",
+    "engram_working_memory": "allow",
+    "engram_inbox": "allow",
+    "engram_ack": "allow",
+    "engram_send": "allow",
+    "engram_handoff": "allow",
+    "engram_agents": "allow",
+    "engram_experts": "allow",
+    "engram_channel": "allow",
+    "engram_task": "allow",
+    "engram_context_window": "allow",
+    "engram_file_lock": "allow"
+  },
+
+  "mcp": {
+    "engram": {
+      "type": "local",
+      "command": ["node", "{env:AXON_ENGRAM_MCP_SERVER}"],
+      "environment": {
+        "ENGRAM_API_KEY": "{env:ENGRAM_API_KEY}",
+        "ENGRAM_WORKER_URL": "{env:ENGRAM_WORKER_URL}",
+        "ENGRAM_AGENT_RUNTIME": "axon"
+      },
+      "enabled": true,
+      "timeout": 10000
+    },
+    "agentic-mcp": {
+      "type": "local",
+      "command": ["node", "{env:AXON_AGENTIC_MCP_SERVER}"],
+      "enabled": true,
+      "timeout": 10000
+    }
+  }
+}
