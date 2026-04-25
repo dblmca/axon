@@ -144,20 +144,24 @@ const live: Layer.Layer<
         options.instructions = system.join("\n")
       }
 
+      // Many providers (e.g. llama.cpp with Qwen chat templates) require exactly
+      // one system message at position 0. Only Anthropic-family SDKs benefit from
+      // the multi-part system array (prompt caching). For everything else, join
+      // system parts into a single message.
+      const supportsMultipleSystemMessages =
+        input.model.api.npm === "@ai-sdk/anthropic" ||
+        input.model.api.npm === "@ai-sdk/amazon-bedrock" ||
+        input.model.api.npm === "@ai-sdk/google-vertex/anthropic"
+      const systemMessages: ModelMessage[] = supportsMultipleSystemMessages
+        ? system.map((x) => ({ role: "system" as const, content: x }))
+        : [{ role: "system" as const, content: system.join("\n") }]
+
       const isWorkflow = language instanceof GitLabWorkflowLanguageModel
       const messages = isOpenaiOauth
         ? input.messages
         : isWorkflow
           ? input.messages
-          : [
-              ...system.map(
-                (x): ModelMessage => ({
-                  role: "system",
-                  content: x,
-                }),
-              ),
-              ...input.messages,
-            ]
+          : [...systemMessages, ...input.messages]
 
       const params = yield* plugin.trigger(
         "chat.params",
