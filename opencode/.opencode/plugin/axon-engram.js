@@ -195,11 +195,11 @@ function capabilities(input, runtime, current) {
     } catch {}
   }
   const llm = activeModel(runtime, current)
-  const label = modelLabel(runtime, llm)
+  const label = modelLabel(runtime, llm) || SOURCE_AI
   return {
+    source_ai: SOURCE_AI,
     mcp_servers: Array.from(new Set([...runtime.mcpNames, ...local])).slice(0, 30),
-    project_files: [],
-    ...(label ? { model: label } : {}),
+    model: label,
     ...(llm
       ? {
           llm: {
@@ -214,7 +214,7 @@ function capabilities(input, runtime, current) {
 
 function agentName(input, runtime) {
   if (runtime.agentName) return runtime.agentName
-  return `${slug(projectName(input))}-${hostShort()}-${SOURCE_AI}`
+  return `${slug(projectName(input))}-${hostShort()}-${AGENT_SHORT_ID}`
 }
 
 function log(input, level, message, extra = {}) {
