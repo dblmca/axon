@@ -1,0 +1,9 @@
+{
+  "name_prefix": "axon",
+  "source_ai": "axon",
+  "capabilities": {
+    "domains": ["coding", "testing", "documentation"],
+    "model": "qwen3.6-35b",
+    "tools": ["bash", "read", "write", "edit", "glob", "grep"]
+  }
+}

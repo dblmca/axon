@@ -197,6 +197,24 @@ function title(tool, args, type) {
   return `${tool} executed`
 }
 
+let cachedAgentConfig
+
+function loadAgentConfig(worktree) {
+  if (cachedAgentConfig !== undefined) return cachedAgentConfig
+  for (const rel of [".axon/engram-agent.json", ".opencode/engram-agent.json"]) {
+    const full = path.join(worktree, rel)
+    try {
+      const parsed = JSON.parse(fs.readFileSync(full, "utf8"))
+      if (parsed && typeof parsed === "object") {
+        cachedAgentConfig = parsed
+        return cachedAgentConfig
+      }
+    } catch {}
+  }
+  cachedAgentConfig = null
+  return null
+}
+
 function capabilities(input, runtime, current) {
   const local = []
   const file = path.join(input.worktree, ".mcp.json")
@@ -208,10 +226,12 @@ function capabilities(input, runtime, current) {
       }
     } catch {}
   }
+  const agentCfg = loadAgentConfig(input.worktree)
+  const cfgCaps = agentCfg?.capabilities || {}
   const llm = activeModel(runtime, current)
-  const label = modelLabel(runtime, llm) || SOURCE_AI
+  const label = modelLabel(runtime, llm) || cfgCaps.model || SOURCE_AI
   return {
-    source_ai: SOURCE_AI,
+    source_ai: agentCfg?.source_ai || SOURCE_AI,
     mcp_servers: Array.from(new Set([...runtime.mcpNames, ...local])).slice(0, 30),
     model: label,
     ...(llm
@@ -222,7 +242,8 @@ function capabilities(input, runtime, current) {
           },
         }
       : {}),
-    domains: ["coding", "interop", "memory"],
+    domains: Array.from(new Set([...(cfgCaps.domains || []), "coding", "interop", "memory"])),
+    ...(cfgCaps.tools?.length ? { tools: cfgCaps.tools } : {}),
   }
 }
 
@@ -414,7 +435,7 @@ async function contextBlock(input, runtime, sessionID) {
 
   const project = projectName(input)
   const agent = current.agentName || agentName(input, runtime)
-  const [ctx, inbox, instincts] = await Promise.all([
+  const [ctx, inbox, instincts, tasks] = await Promise.all([
     request(runtime, "/api/search/context", {
       method: "POST",
       body: {
@@ -429,11 +450,17 @@ async function contextBlock(input, runtime, sessionID) {
       runtime,
       `/api/instincts?project=${encodeURIComponent(project)}&min_confidence=0.7&limit=3`,
     ).catch(() => ({ ok: false, status: 0 })),
+    request(
+      runtime,
+      `/api/tasks?project=${encodeURIComponent(project)}&assigned_to=${encodeURIComponent(agent)}`,
+    ).catch(() => ({ ok: false, status: 0 })),
   ])
 
   const data = ctx.data || {}
   const unread = Array.isArray(inbox.data?.messages) ? inbox.data.messages : []
   const learned = Array.isArray(instincts.data?.instincts) ? instincts.data.instincts : []
+  const allTasks = Array.isArray(tasks.data?.tasks) ? tasks.data.tasks : (Array.isArray(tasks.data) ? tasks.data : [])
+  const pendingTasks = allTasks.filter((t) => t.status !== "done" && t.status !== "cancelled")
 
   const freshDecisions = (Array.isArray(data.recent_decisions) ? data.recent_decisions : [])
     .filter((d) => daysOld(d.created_at || d.date) < DECISION_MAX_AGE_DAYS)
