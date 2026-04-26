@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process"
 import crypto from "node:crypto"
 import fs from "node:fs"
 import os from "node:os"
@@ -27,6 +28,17 @@ function hostShort() {
     .slice(0, 20)
   if (value) return value
   return crypto.createHash("sha1").update(hostname()).digest("hex").slice(0, 8)
+}
+
+function tmuxSession() {
+  const explicit = (process.env.ENGRAM_TMUX_SESSION || "").trim()
+  if (explicit) return explicit
+  if (!process.env.TMUX) return ""
+  try {
+    return execSync("tmux display-message -p '#S'", { timeout: 2_000, encoding: "utf8" }).trim()
+  } catch {
+    return ""
+  }
 }
 
 function slug(value, fallback = "project", max = 30) {
@@ -277,6 +289,8 @@ async function syncAgent(input, runtime, sessionID) {
   current.agentName = current.agentName || agentName(input, runtime)
   const project = projectName(input)
 
+  const tmux = tmuxSession()
+
   await Promise.allSettled([
     request(runtime, "/api/agents/register", {
       method: "POST",
@@ -287,6 +301,7 @@ async function syncAgent(input, runtime, sessionID) {
         project,
         source_ai: SOURCE_AI,
         capabilities: JSON.stringify(capabilities(input, runtime, current)),
+        ...(tmux ? { tmux_session: tmux } : {}),
       },
     }),
     request(runtime, "/api/agents/heartbeat", {
@@ -294,6 +309,7 @@ async function syncAgent(input, runtime, sessionID) {
       body: {
         name: current.agentName,
         project,
+        ...(tmux ? { tmux_session: tmux } : {}),
       },
     }),
   ])
