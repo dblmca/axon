@@ -58,7 +58,10 @@
   "permission": {
     "agentic-mcp_*": "deny",
 
-    "engram_*": "deny",
+    // "ask" instead of "deny" — deny hides tools from the model entirely,
+    // preventing MCP tool discovery. "ask" shows them but requires approval
+    // (auto-approved with --dangerously-skip-permissions).
+    "engram_*": "ask",
     "engram_status": "allow",
     "engram_search": "allow",
     "engram_recall": "allow",

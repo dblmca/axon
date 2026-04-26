@@ -53,7 +53,7 @@
   "permission": {
     "agentic-mcp_*": "deny",
 
-    "engram_*": "deny",
+    "engram_*": "ask",
     "engram_status": "allow",
     "engram_search": "allow",
     "engram_recall": "allow",

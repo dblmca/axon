@@ -474,14 +474,14 @@ async function contextBlock(input, runtime, sessionID) {
 
   lines.push(
     "",
-    "### Engram MCP Tool Examples",
-    "Use these tools by calling them with the arguments shown:",
-    '- engram_inbox — check for messages: `engram_inbox({})`',
-    '- engram_search — search memory: `engram_search({"query": "topic"})`',
-    '- engram_task — complete a task: `engram_task({"action": "complete", "id": 42})`',
-    '- engram_send — message an agent: `engram_send({"to": "agent-name", "message": "hello"})`',
-    '- engram_note — save a note: `engram_note({"action": "save", "project": "' + project + '", "title": "Title", "content": "Body"})`',
-    '- engram_channel — post to channel: `engram_channel({"action": "post", "channel": "#engram", "message": "update"})`',
+    "### Engram MCP Tools (call these as tools, NOT via bash)",
+    "These are MCP tools in your tool list. Call them directly like you call bash, read, or edit.",
+    "- engram_inbox: no args needed — returns unread messages",
+    "- engram_search: args {\"query\": \"topic\"} — search Engram memory",
+    "- engram_task: args {\"action\": \"complete\", \"id\": 42} — complete a task",
+    "- engram_send: args {\"to\": \"agent-name\", \"message\": \"text\"} — message an agent",
+    "- engram_note: args {\"action\": \"save\", \"project\": \"" + project + "\", \"title\": \"T\", \"content\": \"body\"} — save a note",
+    "- engram_channel: args {\"action\": \"post\", \"channel\": \"#engram\", \"message\": \"text\"} — post to channel",
   )
 
   lines.push("</axon-engram>")
