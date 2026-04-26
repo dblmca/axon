@@ -3,9 +3,10 @@
 
   // Cloud provider via OpenRouter. For when the local GPU is busy.
   // Requires OPENROUTER_API_KEY. Still connects to local Engram.
+  // Override with AXON_OPENROUTER_MODEL=anthropic/claude-sonnet-4-6 to switch models.
   "enabled_providers": ["openrouter"],
-  "model": "openrouter/deepseek/deepseek-chat-v3-0324",
-  "small_model": "openrouter/deepseek/deepseek-chat-v3-0324",
+  "model": "openrouter/{env:AXON_OPENROUTER_MODEL}",
+  "small_model": "openrouter/{env:AXON_OPENROUTER_MODEL}",
 
   "provider": {
     "openrouter": {
@@ -17,11 +18,43 @@
         "timeout": 120000
       },
       "models": {
-        "deepseek/deepseek-chat-v3-0324": {
-          "name": "DeepSeek Chat V3 (0324)",
+        "deepseek/deepseek-v4-flash": {
+          "name": "DeepSeek V4 Flash",
           "family": "deepseek",
           "attachment": true,
           "reasoning": false,
+          "temperature": true,
+          "tool_call": true,
+          "limit": {
+            "context": 131072,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          }
+        },
+        "anthropic/claude-sonnet-4-6": {
+          "name": "Claude Sonnet 4.6",
+          "family": "claude",
+          "attachment": true,
+          "reasoning": true,
+          "temperature": true,
+          "tool_call": true,
+          "limit": {
+            "context": 200000,
+            "output": 16384
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
+        "qwen/qwen3-coder": {
+          "name": "Qwen3 Coder",
+          "family": "qwen",
+          "attachment": true,
+          "reasoning": true,
           "temperature": true,
           "tool_call": true,
           "limit": {
@@ -66,7 +99,16 @@
     "engram_channel": "allow",
     "engram_task": "allow",
     "engram_context_window": "allow",
-    "engram_file_lock": "allow"
+    "engram_file_lock": "allow",
+    "engram_orchestrate": "allow",
+    "engram_schedule": "allow",
+    "engram_remind": "allow",
+    "engram_wiki": "allow",
+    "engram_graph": "allow",
+    "engram_dashboard": "allow",
+    "engram_notify": "allow",
+    "engram_forget": "allow",
+    "engram_instincts": "allow"
   },
 
   "mcp": {

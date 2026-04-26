@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROFILE="$ROOT/profiles/axon.cloud-openrouter.jsonc"
 
+: "${AXON_OPENROUTER_MODEL:=deepseek/deepseek-v4-flash}"
 : "${AXON_ENGRAM_MCP_SERVER:=/home/mmca/mcp-servers/engram-mcp/engram-mcp-server.mjs}"
 : "${AXON_AGENTIC_MCP_SERVER:=/home/mmca/mcp-servers/agentic-mcp/agentic-mcp-server.mjs}"
 : "${ENGRAM_WORKER_URL:=http://localhost:37779}"
@@ -30,6 +31,7 @@ if ! command -v bun >/dev/null 2>&1; then
 fi
 
 export OPENROUTER_API_KEY
+export AXON_OPENROUTER_MODEL
 export AXON_ENGRAM_MCP_SERVER
 export AXON_AGENTIC_MCP_SERVER
 export ENGRAM_API_KEY
