@@ -11,6 +11,7 @@ const DEFAULT_TIMEOUT_MS = 1_500
 const CONTEXT_CHAR_BUDGET = 8_000
 const DECISION_MAX_AGE_DAYS = 7
 const OBSERVATION_MAX_AGE_DAYS = 3
+const AGENT_SHORT_ID = crypto.randomBytes(2).toString("hex")
 
 const sessionState = new Map()
 
@@ -86,6 +87,8 @@ function state(sessionID) {
     modelID: "",
     context: "",
     contextExpiresAt: 0,
+    toolsUsed: new Set(),
+    filesModified: new Set(),
   }
   sessionState.set(sessionID, next)
   return next
@@ -453,9 +456,24 @@ export default {
         if (!deleted) return
 
         const current = state(deleted)
+        const tools = Array.from(current.toolsUsed)
+        const files = Array.from(current.filesModified)
+        const prompts = current.promptNumber
+        const parts = [`${prompts} prompt${prompts !== 1 ? "s" : ""}`]
+        if (tools.length) parts.push(`tools: ${tools.join(", ")}`)
+        if (files.length) parts.push(`files: ${files.join(", ")}`)
+        const summary = `Session summary: ${parts.join("; ")}`
+
         background(
           input,
           Promise.allSettled([
+            request(runtime, `/api/sessions/${deleted}/summarize`, {
+              method: "POST",
+              body: {
+                summary,
+                metadata: { prompts, tools, files },
+              },
+            }),
             request(runtime, `/api/sessions/${deleted}/complete`, { method: "POST", body: {} }),
             current.agentName
               ? request(runtime, "/api/agents/deregister", {
@@ -470,6 +488,7 @@ export default {
           "failed to finalize Engram session",
           { sessionID: deleted },
         )
+        sessionState.delete(deleted)
       },
 
       "chat.message": async ({ sessionID, model }, output) => {
@@ -516,6 +535,13 @@ export default {
 
         const type = toolType(tool, args)
         if (type === "skip") return
+
+        const current = state(sessionID)
+        current.toolsUsed.add(String(tool))
+        if (type === "code_edit") {
+          const file = String(args?.file_path || args?.path || args?.file || "").trim()
+          if (file) current.filesModified.add(file)
+        }
 
         background(
           input,
