@@ -467,9 +467,11 @@ async function contextBlock(input, runtime, sessionID) {
   const freshObservations = (Array.isArray(data.relevant_observations) ? data.relevant_observations : [])
     .filter((o) => daysOld(o.created_at || o.date) < OBSERVATION_MAX_AGE_DAYS)
 
+  const statusParts = [`inbox: ${unread.length} unread`, `tasks: ${pendingTasks.length} pending`]
   const lines = [
     "<axon-engram>",
     `Agent: ${agent} | Project: ${project} | Runtime: Axon+Engram`,
+    statusParts.join(" | "),
     `MCP tools: ${runtime.mcpNames.join(", ")}`,
   ]
 
