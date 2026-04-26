@@ -167,6 +167,10 @@ case "$CMD" in
     echo "profile: ${PROFILE_NAME}"
     ;;
   smoke)
+    if [[ "${1:-}" == "--cloud" ]]; then
+      shift
+      exec bash "$SCRIPTS/smoke-cloud-openrouter.sh" "$@"
+    fi
     exec bash "$SCRIPTS/smoke-vector-qwen.sh" "$@"
     ;;
   test)
@@ -196,7 +200,7 @@ Commands:
   version        Show version, model, and engram status
   inbox          Check Engram inbox for unread messages
   tasks          Show active tasks assigned to this agent
-  smoke          Run smoke test suite
+  smoke          Run smoke test suite (--cloud for OpenRouter)
   test           Run interop test suite
   status         Show Axon agent/service status
   fleet <N>      Start N agents in tmux sessions
