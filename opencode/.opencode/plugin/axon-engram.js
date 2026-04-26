@@ -326,9 +326,30 @@ async function ensureSession(input, runtime, sessionID) {
   return current.initializing
 }
 
-function formatItems(titleText, items, render) {
-  if (!Array.isArray(items) || items.length === 0) return []
-  return [titleText, ...items.slice(0, 3).map(render)]
+function daysOld(dateValue) {
+  if (!dateValue) return Infinity
+  const ts = typeof dateValue === "number" ? dateValue : Date.parse(dateValue)
+  if (!Number.isFinite(ts)) return Infinity
+  return (Date.now() - ts) / 86_400_000
+}
+
+function budgetAppend(lines, budget, section, items, render, maxItems = 3) {
+  if (!Array.isArray(items) || items.length === 0) return budget
+  const header = `\n### ${section}`
+  let remaining = budget - header.length
+  if (remaining <= 0) return 0
+  const rendered = []
+  for (const item of items.slice(0, maxItems)) {
+    const line = render(item)
+    if (!line) continue
+    const cost = line.length + 1
+    if (remaining - cost < 0) break
+    remaining -= cost
+    rendered.push(line)
+  }
+  if (rendered.length === 0) return budget
+  lines.push(header, ...rendered)
+  return remaining
 }
 
 async function contextBlock(input, runtime, sessionID) {
@@ -349,7 +370,7 @@ async function contextBlock(input, runtime, sessionID) {
         observation_limit: 6,
       },
     }),
-    request(runtime, `/api/agents/messages/inbox?name=${encodeURIComponent(agent)}&unread_only=true&limit=3`),
+    request(runtime, `/api/agents/messages/inbox?name=${encodeURIComponent(agent)}&unread_only=true&limit=5`),
     request(
       runtime,
       `/api/instincts?project=${encodeURIComponent(project)}&min_confidence=0.7&limit=3`,
@@ -360,42 +381,43 @@ async function contextBlock(input, runtime, sessionID) {
   const unread = Array.isArray(inbox.data?.messages) ? inbox.data.messages : []
   const learned = Array.isArray(instincts.data?.instincts) ? instincts.data.instincts : []
 
+  const freshDecisions = (Array.isArray(data.recent_decisions) ? data.recent_decisions : [])
+    .filter((d) => daysOld(d.created_at || d.date) < DECISION_MAX_AGE_DAYS)
+  const freshObservations = (Array.isArray(data.relevant_observations) ? data.relevant_observations : [])
+    .filter((o) => daysOld(o.created_at || o.date) < OBSERVATION_MAX_AGE_DAYS)
+
   const lines = [
     "<axon-engram>",
-    "This Axon session shares Engram state with Claude Code and Codex.",
-    `Shared agent identity: ${agent}.`,
-    `Shared project: ${project}.`,
-    `If Engram MCP tools are connected in this session, prefer them for cross-client memory and coordination: ${runtime.mcpNames.join(", ")}.`,
+    `Agent: ${agent} | Project: ${project} | Runtime: Axon+Engram`,
+    `MCP tools: ${runtime.mcpNames.join(", ")}`,
   ]
 
-  lines.push(
-    ...formatItems("Unread inbox preview:", unread, (item) => `- ${cleanText(item.sender, 60)}: ${cleanText(item.content, 180)}`),
-  )
-  lines.push(
-    ...formatItems("Recent decisions:", data.recent_decisions, (item) => {
-      const why = cleanText(item.rationale, 120)
-      return `- ${cleanText(item.chosen, 140)}${why ? ` | ${why}` : ""}`
-    }),
-  )
-  lines.push(
-    ...formatItems("Recent sessions:", data.recent_sessions, (item) => {
-      const summary = cleanText(item.request || item.completed || item.note || "", 160)
-      return `- ${cleanText(item.status || "recent", 20)} | ${cleanText(item.date || "", 24)} | ${summary}`
-    }),
-  )
-  lines.push(
-    ...formatItems("Relevant past work:", data.relevant_observations, (item) => {
-      const relevance = Number.isFinite(item.relevance) ? ` (${item.relevance}% match)` : ""
-      return `- ${cleanText(item.title, 160)}${relevance}`
-    }),
-  )
-  lines.push(
-    ...formatItems("Learned patterns:", learned, (item) => {
-      const trigger = cleanText(item.trigger_pattern, 80)
-      const action = cleanText(item.action, 120)
-      return `- ${trigger || "pattern"}${action ? ` -> ${action}` : ""}`
-    }),
-  )
+  let remaining = CONTEXT_CHAR_BUDGET - lines.join("\n").length
+
+  remaining = budgetAppend(lines, remaining, "Inbox (act on these)", unread, (item) =>
+    `- ${cleanText(item.sender, 60)}: ${cleanText(item.content, 200)}`, 5)
+
+  remaining = budgetAppend(lines, remaining, "Recent Decisions", freshDecisions, (item) => {
+    const why = cleanText(item.rationale, 100)
+    return `- ${cleanText(item.chosen, 140)}${why ? ` — ${why}` : ""}`
+  }, 3)
+
+  remaining = budgetAppend(lines, remaining, "Sessions", data.recent_sessions, (item) => {
+    const summary = cleanText(item.request || item.completed || item.note || "", 140)
+    return `- ${cleanText(item.status || "recent", 16)} | ${cleanText(item.date || "", 10)} | ${summary}`
+  }, 3)
+
+  remaining = budgetAppend(lines, remaining, "Related Work", freshObservations, (item) => {
+    const relevance = Number.isFinite(item.relevance) ? ` (${item.relevance}%)` : ""
+    return `- ${cleanText(item.title, 140)}${relevance}`
+  }, 4)
+
+  budgetAppend(lines, remaining, "Learned Patterns", learned, (item) => {
+    const trigger = cleanText(item.trigger_pattern, 70)
+    const action = cleanText(item.action, 100)
+    return `- ${trigger || "pattern"}${action ? ` -> ${action}` : ""}`
+  }, 3)
+
   lines.push("</axon-engram>")
 
   current.context = lines.join("\n")
