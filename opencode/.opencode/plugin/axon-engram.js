@@ -263,7 +263,22 @@ function log(input, level, message, extra = {}) {
 }
 
 function background(input, promise, message, extra = {}) {
-  void promise.catch((error) => log(input, "WARN", message, { ...extra, error: errorMessage(error) }))
+  const tracked = promise.catch((error) => log(input, "WARN", message, { ...extra, error: errorMessage(error) }))
+  inflight.add(tracked)
+  tracked.finally(() => inflight.delete(tracked))
+}
+
+async function drain(input) {
+  if (inflight.size === 0) return
+  const pending = Array.from(inflight)
+  const timeout = new Promise((resolve) => setTimeout(resolve, DRAIN_TIMEOUT_MS))
+  const result = await Promise.race([
+    Promise.allSettled(pending),
+    timeout.then(() => "timeout"),
+  ])
+  if (result === "timeout") {
+    await log(input, "WARN", `drain timed out with ${inflight.size} request(s) still pending`)
+  }
 }
 
 async function request(runtime, endpoint, init = {}) {
@@ -488,6 +503,10 @@ export default {
   server: async (input, options) => {
     const runtime = config(options)
 
+    process.on("beforeExit", () => {
+      if (inflight.size > 0) drain(input)
+    })
+
     return {
       event: async ({ event }) => {
         if (!runtime.enabled || !runtime.apiKey) return
@@ -536,6 +555,7 @@ export default {
           "failed to finalize Engram session",
           { sessionID: deleted },
         )
+        await drain(input)
         sessionState.delete(deleted)
       },
 
