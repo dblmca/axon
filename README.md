@@ -73,6 +73,7 @@ Full architecture doc: [docs/architecture.md](docs/architecture.md)
 | `scripts/run-vector-qwen.sh` | Launcher — injects profile via `OPENCODE_CONFIG_CONTENT` |
 | `scripts/smoke-vector-qwen.sh` | Smoke test — validates full stack end-to-end |
 | `scripts/test-interop.sh` | Interop test suite — 10 tests across Engram coordination plane |
+| `.axon/instructions.md` | System instructions injected into every Axon session |
 | `profiles/axon.remote-engram.jsonc` | Remote Engram profile — Qwen + remote Engram host |
 | `profiles/axon.cloud-openrouter.jsonc` | Cloud profile — OpenRouter + local Engram |
 | `profiles/axon.minimal-offline.jsonc` | Offline profile — local Qwen only, no network |
@@ -114,7 +115,11 @@ Along the way, bugs in the orchestrator itself were found and fixed: idle detect
 
 Sprint 3 fixed the system-message ordering bug that blocked non-pure (authenticated) launches with Qwen's chat template.
 
-Sprint 4 closed all Phase 2 and Phase 3 gaps from the architecture: assistant-response capture, session summarization, tighter prompt injection, three new deployment profiles, agent naming alignment, and a 10-test interop suite proving Axon participates on the Engram coordination plane (agent registration, messaging, channels, tasks, context retrieval). Two Phase 4 items remain (UX rebrand and native coordination affordances).
+Sprint 4 closed all Phase 2 and Phase 3 gaps from the architecture: assistant-response capture, session summarization, tighter prompt injection, three new deployment profiles, agent naming alignment, and a 10-test interop suite proving Axon participates on the Engram coordination plane (agent registration, messaging, channels, tasks, context retrieval).
+
+Sprint 5 added tmux-based persistent sessions and fleet management, plus a status dashboard.
+
+Sprint 6 added the `bin/axon` CLI wrapper (profile auto-detection, ENGRAM_API_KEY auto-load, subcommands), `.axon/instructions.md` for per-project system instructions, graceful shutdown with HTTP request draining, and fixed MCP tool visibility so Qwen can discover and call engram tools. Two Phase 4 items remain (UX rebrand and native coordination affordances).
 
 The agents that built Axon are the same kind of agents Axon is designed to run.
 
