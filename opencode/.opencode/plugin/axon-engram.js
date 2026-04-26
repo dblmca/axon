@@ -9,12 +9,14 @@ const SOURCE_AI = "axon"
 const DEFAULT_WORKER_URL = "http://localhost:37779"
 const DEFAULT_CONTEXT_TTL_MS = 30_000
 const DEFAULT_TIMEOUT_MS = 1_500
+const DRAIN_TIMEOUT_MS = 5_000
 const CONTEXT_CHAR_BUDGET = 8_000
 const DECISION_MAX_AGE_DAYS = 7
 const OBSERVATION_MAX_AGE_DAYS = 3
 const AGENT_SHORT_ID = crypto.randomBytes(2).toString("hex")
 
 const sessionState = new Map()
+const inflight = new Set()
 
 function hostname() {
   return process.env.CLIENT_HOSTNAME || process.env.HOSTNAME || os.hostname()
@@ -222,6 +224,24 @@ function capabilities(input, runtime, current) {
       : {}),
     domains: ["coding", "interop", "memory"],
   }
+}
+
+let cachedInstructions
+
+function loadInstructions(worktree) {
+  if (cachedInstructions !== undefined) return cachedInstructions
+  for (const rel of [".axon/instructions.md", ".opencode/instructions.md"]) {
+    const full = path.join(worktree, rel)
+    try {
+      const text = fs.readFileSync(full, "utf8").trim()
+      if (text) {
+        cachedInstructions = `<axon-instructions>\n${text}\n</axon-instructions>`
+        return cachedInstructions
+      }
+    } catch {}
+  }
+  cachedInstructions = ""
+  return cachedInstructions
 }
 
 function agentName(input, runtime) {
@@ -437,6 +457,18 @@ async function contextBlock(input, runtime, sessionID) {
     return `- ${trigger || "pattern"}${action ? ` -> ${action}` : ""}`
   }, 3)
 
+  lines.push(
+    "",
+    "### Engram MCP Tool Examples",
+    "Use these tools by calling them with the arguments shown:",
+    '- engram_inbox — check for messages: `engram_inbox({})`',
+    '- engram_search — search memory: `engram_search({"query": "topic"})`',
+    '- engram_task — complete a task: `engram_task({"action": "complete", "id": 42})`',
+    '- engram_send — message an agent: `engram_send({"to": "agent-name", "message": "hello"})`',
+    '- engram_note — save a note: `engram_note({"action": "save", "project": "' + project + '", "title": "Title", "content": "Body"})`',
+    '- engram_channel — post to channel: `engram_channel({"action": "post", "channel": "#engram", "message": "update"})`',
+  )
+
   lines.push("</axon-engram>")
 
   current.context = lines.join("\n")
@@ -641,6 +673,9 @@ export default {
       },
 
       "experimental.chat.system.transform": async ({ sessionID, model }, output) => {
+        const instructions = loadInstructions(input.worktree)
+        if (instructions) output.system.push(instructions)
+
         if (!runtime.enabled || !runtime.apiKey || !sessionID) return
         const changedModel = noteModel(sessionID, model)
         if (changedModel) {
