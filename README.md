@@ -16,17 +16,28 @@ Axon gives any LLM the same collaborative infrastructure that Claude Code agents
 ## Quick Start
 
 ```bash
-# Smoke test (Qwen endpoint + Engram + MCP + tool round-trip)
-scripts/smoke-vector-qwen.sh
+# Add to PATH (or symlink bin/axon somewhere on your PATH)
+export PATH="/home/mmca/projects/axon/bin:$PATH"
 
-# Interop test suite (agent registration, messaging, channels, tasks, context)
-ENGRAM_API_KEY=... scripts/test-interop.sh
+# Interactive TUI (auto-loads ENGRAM_API_KEY from ~/engram/engram-server/.env)
+axon
 
-# Launch interactive session
-ENGRAM_API_KEY=... scripts/run-vector-qwen.sh
+# Headless single-prompt mode
+axon run "list the current directory"
+
+# Smoke test + interop test
+axon smoke
+axon test
+
+# Use a different profile
+axon --profile cloud-openrouter
+axon --profile minimal-offline
+
+# Start a fleet of N agents in tmux
+axon fleet 4
 ```
 
-Requires `bun` and a running Engram server.
+Requires `bun` and a running Engram server (except `minimal-offline` profile).
 
 ## Architecture
 
@@ -56,6 +67,7 @@ Full architecture doc: [docs/architecture.md](docs/architecture.md)
 
 | File | What |
 |------|------|
+| `bin/axon` | CLI entry point — profile selection, subcommands, auto-config |
 | `opencode/.opencode/plugin/axon-engram.js` | Core plugin — session init, capture, context injection |
 | `profiles/axon.vector-qwen-engram.jsonc` | Deployment profile — provider, tools, permissions, MCP config |
 | `scripts/run-vector-qwen.sh` | Launcher — injects profile via `OPENCODE_CONFIG_CONTENT` |

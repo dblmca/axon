@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="0.1.0"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPTS="$ROOT/scripts"
+
+# --- Profile selection ---
+PROFILE_NAME="${AXON_PROFILE:-vector-qwen-engram}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --profile)
+      PROFILE_NAME="$2"
+      shift 2
+      ;;
+    --profile=*)
+      PROFILE_NAME="${1#*=}"
+      shift
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+PROFILE="$ROOT/profiles/axon.${PROFILE_NAME}.jsonc"
+if [[ ! -f "$PROFILE" ]]; then
+  echo "Unknown profile: $PROFILE_NAME" >&2
+  echo "Available: $(ls "$ROOT/profiles/"axon.*.jsonc 2>/dev/null | xargs -I{} basename {} .jsonc | sed 's/^axon\.//' | paste -sd', ')" >&2
+  exit 1
+fi
+
+# --- Auto-load ENGRAM_API_KEY from engram-server .env if not set ---
+if [[ -z "${ENGRAM_API_KEY:-}" && "$PROFILE_NAME" != "minimal-offline" ]]; then
+  ENGRAM_ENV="$HOME/engram/engram-server/.env"
+  if [[ -f "$ENGRAM_ENV" ]]; then
+    ENGRAM_API_KEY="$(grep -m1 '^ENGRAM_API_KEY=' "$ENGRAM_ENV" | cut -d= -f2-)"
+    export ENGRAM_API_KEY
+    echo "note: loaded ENGRAM_API_KEY from $ENGRAM_ENV" >&2
+  fi
+fi
+
+# --- Env defaults ---
+: "${AXON_QWEN_BASE_URL:=http://192.168.1.153:8081/v1}"
+: "${AXON_QWEN_MODEL_ID:=Qwen3.6-35B-A3B-abliterated-Q4_K_M.gguf}"
+: "${AXON_ENGRAM_MCP_SERVER:=/home/mmca/mcp-servers/engram-mcp/engram-mcp-server.mjs}"
+: "${AXON_AGENTIC_MCP_SERVER:=/home/mmca/mcp-servers/agentic-mcp/agentic-mcp-server.mjs}"
+: "${ENGRAM_WORKER_URL:=http://localhost:37779}"
+: "${AXON_ENGRAM_MCP_NAMES:=engram,agentic-mcp}"
+
+export AXON_QWEN_BASE_URL AXON_QWEN_MODEL_ID ENGRAM_WORKER_URL
+export AXON_ENGRAM_MCP_SERVER AXON_AGENTIC_MCP_SERVER AXON_ENGRAM_MCP_NAMES
+
+# --- Subcommand dispatch ---
+CMD="${1:-}"
+shift 2>/dev/null || true
+
+banner() {
+  local model engram_status
+  model="${AXON_QWEN_MODEL_ID%.gguf}"
+  model="${model##*-Q}" ; model="Q${model}"
+  if [[ "$PROFILE_NAME" == "minimal-offline" ]]; then
+    engram_status="offline"
+  elif curl -fsS "${ENGRAM_WORKER_URL%/}/health" >/dev/null 2>&1; then
+    engram_status="connected"
+  else
+    engram_status="unreachable"
+  fi
+  echo "axon v${VERSION} | profile: ${PROFILE_NAME} | engram: ${engram_status}"
+}
+
+launch() {
+  if ! command -v bun >/dev/null 2>&1; then
+    echo "bun is required to launch the vendored OpenCode runtime." >&2
+    exit 1
+  fi
+
+  if [[ "$PROFILE_NAME" != "minimal-offline" && -z "${ENGRAM_API_KEY:-}" ]]; then
+    echo "ENGRAM_API_KEY is required for profile '$PROFILE_NAME'." >&2
+    exit 1
+  fi
+
+  [[ -n "${ENGRAM_API_KEY:-}" ]] && export ENGRAM_API_KEY
+  [[ -n "${OPENROUTER_API_KEY:-}" ]] && export OPENROUTER_API_KEY
+  export OPENCODE_CONFIG_CONTENT="$(cat "$PROFILE")"
+
+  cd "$ROOT/opencode"
+  exec bun run dev "$@"
+}
+
+case "$CMD" in
+  ""|tui)
+    banner
+    launch "$@"
+    ;;
+  run)
+    if [[ $# -eq 0 ]]; then
+      echo "Usage: axon run <prompt>" >&2
+      exit 1
+    fi
+    banner
+    launch run --pure --dangerously-skip-permissions "$@"
+    ;;
+  smoke)
+    exec bash "$SCRIPTS/smoke-vector-qwen.sh" "$@"
+    ;;
+  test)
+    exec bash "$SCRIPTS/test-interop.sh" "$@"
+    ;;
+  status)
+    exec bash "$SCRIPTS/axon-status.sh" "$@"
+    ;;
+  fleet)
+    exec bash "$SCRIPTS/start-axon-fleet.sh" "$@"
+    ;;
+  help|-h|--help)
+    cat <<HELP
+axon v${VERSION} — networked coding-agent harness
+
+Usage: axon [--profile NAME] [command] [args...]
+
+Commands:
+  (default)      Interactive TUI session
+  run <prompt>   Headless single-prompt mode
+  smoke          Run smoke test suite
+  test           Run interop test suite
+  status         Show Axon agent/service status
+  fleet <N>      Start N agents in tmux sessions
+  help           Show this help
+
+Options:
+  --profile NAME   Select deployment profile (default: vector-qwen-engram)
+                   Available: vector-qwen-engram, remote-engram, cloud-openrouter, minimal-offline
+
+Environment:
+  AXON_PROFILE         Default profile name
+  ENGRAM_API_KEY       Engram authentication (auto-loaded from ~/engram/engram-server/.env)
+  AXON_QWEN_BASE_URL   Qwen endpoint (default: http://192.168.1.153:8081/v1)
+  OPENROUTER_API_KEY   Required for cloud-openrouter profile
+HELP
+    ;;
+  *)
+    echo "Unknown command: $CMD (try 'axon help')" >&2
+    exit 1
+    ;;
+esac
