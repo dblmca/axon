@@ -8,6 +8,9 @@ const SOURCE_AI = "axon"
 const DEFAULT_WORKER_URL = "http://localhost:37779"
 const DEFAULT_CONTEXT_TTL_MS = 30_000
 const DEFAULT_TIMEOUT_MS = 1_500
+const CONTEXT_CHAR_BUDGET = 8_000
+const DECISION_MAX_AGE_DAYS = 7
+const OBSERVATION_MAX_AGE_DAYS = 3
 
 const sessionState = new Map()
 
@@ -66,6 +69,7 @@ function config(options) {
     modelLabel: String(input.modelLabel ?? process.env.AXON_ENGRAM_MODEL_LABEL ?? "").trim(),
     contextTtlMs: Number(input.contextTtlMs ?? process.env.AXON_ENGRAM_CONTEXT_TTL_MS ?? DEFAULT_CONTEXT_TTL_MS),
     timeoutMs: Number(input.timeoutMs ?? process.env.AXON_ENGRAM_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS),
+    captureResponses: (input.captureResponses ?? process.env.AXON_CAPTURE_RESPONSES ?? "true") !== "false",
     mcpNames: mcpNames(input),
   }
 }
@@ -514,6 +518,41 @@ export default {
           })(),
           "failed to record Engram observation",
           { sessionID, tool },
+        )
+      },
+
+      "experimental.text.complete": async ({ sessionID, messageID, partID }, output) => {
+        if (!runtime.enabled || !runtime.apiKey || !runtime.captureResponses) return
+        const text = String(output.text || "").trim()
+        if (!text) return
+
+        const current = state(sessionID)
+        const llm = activeModel(runtime, current)
+        const label = modelLabel(runtime, llm)
+
+        background(
+          input,
+          (async () => {
+            await ensureSession(input, runtime, sessionID)
+            await postObservation(runtime, sessionID, {
+              project: projectName(input),
+              type: "assistant_response",
+              title: `assistant response${label ? ` (${label})` : ""}`,
+              subtitle: `${SOURCE_AI} response`,
+              facts: [],
+              narrative: cleanText(text, 500),
+              concepts: ["assistant_response"],
+              prompt_number: current.promptNumber,
+              processing_tier: 1,
+              tier_reason: "axon_plugin",
+              client_hostname: hostname(),
+              created_at_epoch: Date.now(),
+              raw_input: json({ messageID, partID }),
+              raw_output_preview: cleanText(text, 10_000),
+            })
+          })(),
+          "failed to record Engram assistant response",
+          { sessionID, messageID },
         )
       },
 
