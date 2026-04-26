@@ -75,7 +75,16 @@
     "engram_channel": "allow",
     "engram_task": "allow",
     "engram_context_window": "allow",
-    "engram_file_lock": "allow"
+    "engram_file_lock": "allow",
+    "engram_orchestrate": "allow",
+    "engram_schedule": "allow",
+    "engram_remind": "allow",
+    "engram_wiki": "allow",
+    "engram_graph": "allow",
+    "engram_dashboard": "allow",
+    "engram_notify": "allow",
+    "engram_forget": "allow",
+    "engram_instincts": "allow"
   },
 
   // Axon should come up on the same shared coordination plane as Claude/Codex.
