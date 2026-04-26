@@ -56,18 +56,75 @@ export AXON_ENGRAM_MCP_SERVER AXON_AGENTIC_MCP_SERVER AXON_ENGRAM_MCP_NAMES
 CMD="${1:-}"
 shift 2>/dev/null || true
 
-banner() {
-  local model engram_status
-  model="${AXON_QWEN_MODEL_ID%.gguf}"
-  model="${model##*-Q}" ; model="Q${model}"
+engram_status() {
   if [[ "$PROFILE_NAME" == "minimal-offline" ]]; then
-    engram_status="offline"
+    echo "offline"
   elif curl -fsS "${ENGRAM_WORKER_URL%/}/health" >/dev/null 2>&1; then
-    engram_status="connected"
+    echo "connected"
   else
-    engram_status="unreachable"
+    echo "unreachable"
   fi
-  echo "axon v${VERSION} | profile: ${PROFILE_NAME} | engram: ${engram_status}"
+}
+
+model_short() {
+  local m="${AXON_QWEN_MODEL_ID%.gguf}"
+  m="${m##*/}"
+  echo "$m"
+}
+
+banner() {
+  local model engram pad
+  model="$(model_short)"
+  engram="$(engram_status)"
+
+  local l1="AXON v${VERSION}"
+  local l2="model: ${model}"
+  local l3="engram: ${engram}"
+  local l4="profile: ${PROFILE_NAME}"
+
+  # Find longest line for box width
+  local maxlen=0
+  for line in "$l1" "$l2" "$l3" "$l4"; do
+    (( ${#line} > maxlen )) && maxlen=${#line}
+  done
+  local w=$(( maxlen + 4 ))
+
+  printf '  \033[36m┌%s┐\033[0m\n' "$(printf '─%.0s' $(seq 1 "$w"))"
+  for line in "$l1" "$l2" "$l3" "$l4"; do
+    pad=$(( w - ${#line} - 2 ))
+    printf '  \033[36m│\033[0m  %s%*s \033[36m│\033[0m\n' "$line" "$pad" ""
+  done
+  printf '  \033[36m└%s┘\033[0m\n' "$(printf '─%.0s' $(seq 1 "$w"))"
+}
+
+first_run() {
+  local cfg_dir="$HOME/.axon"
+  local cfg_file="$cfg_dir/config.json"
+  [[ -f "$cfg_file" ]] && return
+
+  echo ""
+  echo "  Welcome to Axon — a networked coding-agent harness."
+  echo ""
+  echo "  Axon wraps OpenCode with Engram memory, multi-agent coordination,"
+  echo "  and persistent sessions. It runs local LLMs (Qwen on Vector) or"
+  echo "  cloud providers (OpenRouter)."
+  echo ""
+  echo "  Quick start:"
+  echo "    axon              Interactive TUI session"
+  echo "    axon run <prompt>  Headless single-prompt mode"
+  echo "    axon help          Show all commands"
+  echo ""
+
+  mkdir -p "$cfg_dir"
+  cat > "$cfg_file" <<-JSON
+	{
+	  "version": "${VERSION}",
+	  "created": "$(date -Iseconds)",
+	  "profile": "${PROFILE_NAME}"
+	}
+	JSON
+  echo "  Config created: $cfg_file"
+  echo ""
 }
 
 launch() {
@@ -91,6 +148,7 @@ launch() {
 
 case "$CMD" in
   ""|tui)
+    first_run
     banner
     launch "$@"
     ;;
@@ -102,11 +160,23 @@ case "$CMD" in
     banner
     launch run --pure --dangerously-skip-permissions "$@"
     ;;
+  version|-v|--version)
+    echo "axon v${VERSION}"
+    echo "model: $(model_short)"
+    echo "engram: $(engram_status)"
+    echo "profile: ${PROFILE_NAME}"
+    ;;
   smoke)
     exec bash "$SCRIPTS/smoke-vector-qwen.sh" "$@"
     ;;
   test)
     exec bash "$SCRIPTS/test-interop.sh" "$@"
+    ;;
+  inbox)
+    exec bash "$SCRIPTS/axon-inbox.sh" "$@"
+    ;;
+  tasks)
+    exec bash "$SCRIPTS/axon-tasks.sh" "$@"
     ;;
   status)
     exec bash "$SCRIPTS/axon-status.sh" "$@"
@@ -123,6 +193,9 @@ Usage: axon [--profile NAME] [command] [args...]
 Commands:
   (default)      Interactive TUI session
   run <prompt>   Headless single-prompt mode
+  version        Show version, model, and engram status
+  inbox          Check Engram inbox for unread messages
+  tasks          Show active tasks assigned to this agent
   smoke          Run smoke test suite
   test           Run interop test suite
   status         Show Axon agent/service status
