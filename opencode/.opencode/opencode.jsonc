@@ -1,9 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  // Keep provider/model selection deployment-specific.
-  // The first local target can be qwen3.6, but Axon should not pin it here.
-  // Use ../profiles/axon.vector-qwen-engram.jsonc via scripts/run-vector-qwen.sh
-  // for the first concrete deployment/bootstrap path.
   "provider": {},
   "permission": {
     "edit": {
