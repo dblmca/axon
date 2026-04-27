@@ -5,6 +5,14 @@ VERSION="0.1.0"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPTS="$ROOT/scripts"
 
+# --- Load env file (API keys, like ~/.codex/api_key.env) ---
+AXON_ENV="${AXON_ENV:-$HOME/.axon/env}"
+if [[ -f "$AXON_ENV" ]]; then
+  set -a
+  source "$AXON_ENV"
+  set +a
+fi
+
 # --- Profile selection ---
 PROFILE_NAME="${AXON_PROFILE:-vector-qwen-engram}"
 PROFILE_SPECIFIED=false
@@ -81,6 +89,7 @@ fi
 : "${AXON_QWEN_BASE_URL:=http://192.168.1.153:8081/v1}"
 : "${AXON_QWEN_MODEL_ID:=Qwen3.6-35B-A3B-abliterated-Q4_K_M.gguf}"
 : "${AXON_OPENROUTER_MODEL:=deepseek/deepseek-v4-pro}"
+: "${AXON_DEEPSEEK_MODEL:=deepseek-v4-pro}"
 : "${AXON_ENGRAM_MCP_SERVER:=/home/mmca/mcp-servers/engram-mcp/engram-mcp-server.mjs}"
 : "${AXON_AGENTIC_MCP_SERVER:=/home/mmca/mcp-servers/agentic-mcp/agentic-mcp-server.mjs}"
 : "${ENGRAM_WORKER_URL:=http://localhost:37779}"
@@ -90,6 +99,9 @@ if [[ -n "$MODEL_OVERRIDE" ]]; then
   case "$PROFILE_NAME" in
     cloud-openrouter)
       export AXON_OPENROUTER_MODEL="$MODEL_OVERRIDE"
+      ;;
+    cloud-deepseek)
+      export AXON_DEEPSEEK_MODEL="$MODEL_OVERRIDE"
       ;;
     *)
       export AXON_QWEN_MODEL_ID="$MODEL_OVERRIDE"
@@ -104,6 +116,7 @@ fi
 export AXON_QWEN_BASE_URL AXON_QWEN_MODEL_ID ENGRAM_WORKER_URL
 export AXON_ENGRAM_MCP_SERVER AXON_AGENTIC_MCP_SERVER AXON_ENGRAM_MCP_NAMES
 [[ -n "${AXON_OPENROUTER_MODEL:-}" ]] && export AXON_OPENROUTER_MODEL
+[[ -n "${AXON_DEEPSEEK_MODEL:-}" ]] && export AXON_DEEPSEEK_MODEL
 [[ -n "${ENGRAM_PROJECT:-}" ]] && export ENGRAM_PROJECT
 
 # --- Subcommand dispatch ---
@@ -124,6 +137,8 @@ model_short() {
   local m
   if [[ "$PROFILE_NAME" == "cloud-openrouter" ]]; then
     m="${AXON_OPENROUTER_MODEL:-unset}"
+  elif [[ "$PROFILE_NAME" == "cloud-deepseek" ]]; then
+    m="${AXON_DEEPSEEK_MODEL:-unset}"
   else
     m="${AXON_QWEN_MODEL_ID%.gguf}"
   fi
@@ -189,6 +204,7 @@ first_run() {
 launch() {
   [[ -n "${ENGRAM_API_KEY:-}" ]] && export ENGRAM_API_KEY
   [[ -n "${OPENROUTER_API_KEY:-}" ]] && export OPENROUTER_API_KEY
+  [[ -n "${DEEPSEEK_API_KEY:-}" ]] && export DEEPSEEK_API_KEY
   export AXON_PROJECT_DIR
   export OPENCODE_CONFIG_CONTENT="$(cat "$PROFILE")"
 
@@ -198,6 +214,8 @@ launch() {
     [[ -n "${ENGRAM_PROJECT:-}" ]] && echo "project: ${ENGRAM_PROJECT}"
     if [[ "$PROFILE_NAME" == "cloud-openrouter" ]]; then
       echo "model: ${AXON_OPENROUTER_MODEL:-}"
+    elif [[ "$PROFILE_NAME" == "cloud-deepseek" ]]; then
+      echo "model: ${AXON_DEEPSEEK_MODEL:-}"
     else
       echo "model: ${AXON_QWEN_MODEL_ID}"
     fi
@@ -325,7 +343,7 @@ Commands:
 
 Options:
   --profile NAME    Select deployment profile (default: vector-qwen-engram)
-                    Available: vector-qwen-engram, remote-engram, cloud-openrouter, minimal-offline
+                    Available: vector-qwen-engram, remote-engram, cloud-openrouter, cloud-deepseek, minimal-offline
   --model SLUG      Override the selected profile model
   --project NAME    Override Engram project registration
   --task ID         Set task id for a run
