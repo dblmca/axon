@@ -13,6 +13,12 @@ scripts/smoke-vector-qwen.sh
 # Launch interactive session (requires ENGRAM_API_KEY)
 ENGRAM_API_KEY=... scripts/run-vector-qwen.sh
 
+# Launch through the Axon wrapper with profile/model/project selection
+bin/axon --profile cloud-openrouter --model deepseek/deepseek-v4-pro --project axon
+
+# Run a task in an isolated git worktree
+bin/axon --task 42 --worktree run "complete task 42"
+
 # Build/dev (vendored OpenCode)
 cd opencode && bun install && bun run dev
 ```
@@ -62,6 +68,8 @@ The first deployment profile targets the local Vector server running Qwen3.6-35B
 | `ENGRAM_API_KEY` | — | Yes |
 | `AXON_QWEN_BASE_URL` | `http://192.168.1.153:8081/v1` | No |
 | `AXON_QWEN_MODEL_ID` | `Qwen3.6-35B-A3B-abliterated-Q4_K_M.gguf` | No |
+| `AXON_OPENROUTER_MODEL` | `deepseek/deepseek-v4-pro` | No |
+| `AXON_WORKTREE_ROOT` | `/tmp/axon-worktrees` | No |
 | `ENGRAM_WORKER_URL` | `http://localhost:37779` | No |
 | `AXON_ENGRAM_MCP_SERVER` | `/home/mmca/mcp-servers/engram-mcp/engram-mcp-server.mjs` | No |
 | `AXON_AGENTIC_MCP_SERVER` | `/home/mmca/mcp-servers/agentic-mcp/agentic-mcp-server.mjs` | No |

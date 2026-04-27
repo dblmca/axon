@@ -2,12 +2,44 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COUNT="${1:-4}"
+COUNT="4"
+AXON_ARGS=()
 STARTED=()
 SKIPPED=()
 
-ENGRAM_API_KEY="$(grep ENGRAM_API_KEY ~/engram/engram-server/.env | cut -d= -f2)"
-export ENGRAM_API_KEY
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --count)
+      COUNT="$2"
+      shift 2
+      ;;
+    --count=*)
+      COUNT="${1#*=}"
+      shift
+      ;;
+    --profile|--model|--project)
+      AXON_ARGS+=("$1" "$2")
+      shift 2
+      ;;
+    --profile=*|--model=*|--project=*)
+      AXON_ARGS+=("$1")
+      shift
+      ;;
+    -*)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+    *)
+      COUNT="$1"
+      shift
+      ;;
+  esac
+done
+
+if ! [[ "$COUNT" =~ ^[0-9]+$ ]] || [[ "$COUNT" -lt 1 ]]; then
+  echo "Count must be a positive integer." >&2
+  exit 1
+fi
 
 for i in $(seq 1 "$COUNT"); do
   SESSION="axon-${i}"
@@ -15,8 +47,14 @@ for i in $(seq 1 "$COUNT"); do
     SKIPPED+=("$SESSION")
     continue
   fi
-  tmux new-session -d -s "$SESSION" \
-    "ENGRAM_API_KEY='${ENGRAM_API_KEY}' ENGRAM_TMUX_SESSION='${SESSION}' '$ROOT/scripts/run-vector-qwen.sh'; exec bash"
+
+  cmd="$(printf 'ENGRAM_TMUX_SESSION=%q %q' "$SESSION" "$ROOT/bin/axon")"
+  for arg in "${AXON_ARGS[@]}"; do
+    cmd+=" $(printf '%q' "$arg")"
+  done
+  cmd+=" tui; exec bash"
+
+  tmux new-session -d -s "$SESSION" "$cmd"
   STARTED+=("$SESSION")
 done
 

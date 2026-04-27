@@ -2,9 +2,68 @@
 
 **Approach:** A — Thin Launcher (rewire fleet to use existing `bin/axon`, add SIGTERM + worktree + tests)
 **Approved:** 2026-04-27
-**Status:** 🔄 IN PROGRESS
+**Status:** Implemented locally 2026-04-27; live e2e still pending
 **Origin:** engram-one-de9d feature request (#2797), brainstorm session with Codex (gpt-5.4)
 **Requirements:** `docs/fleet-requirements.md`
+
+---
+
+## 2026-04-27 Codex Implementation Update
+
+Codex implemented the thin-launcher fleet work in the current worktree.
+
+Completed:
+- `bin/axon` now supports global `--model`, `--project`, `--task`, and `--worktree` flags.
+- `--model` sets `AXON_OPENROUTER_MODEL` for `cloud-openrouter` and `AXON_QWEN_MODEL_ID` for local profiles.
+- `--project` exports `ENGRAM_PROJECT`; the plugin now honors this in `projectName()`.
+- `bin/axon run` passes `--dir "$AXON_PROJECT_DIR"` into OpenCode so task worktrees become the working directory while the vendored runtime still launches from `opencode/`.
+- `--task <id> --worktree run ...` creates `/tmp/axon-worktrees/task-<id>` or `$AXON_WORKTREE_ROOT/task-<id>`, exports `AXON_TASK_ID` and `AXON_WORKTREE`, removes clean successful worktrees, and preserves dirty or failed worktrees.
+- `scripts/start-axon.sh` and `scripts/start-axon-fleet.sh` now call `bin/axon` instead of `scripts/run-vector-qwen.sh`.
+- Fleet launch accepts positional count or `--count`, and passes `--profile`, `--model`, and `--project`.
+- Global `bin/axon --profile ... --model ... --project ... fleet N` now forwards those flags to `start-axon-fleet.sh`.
+- `opencode/.opencode/plugin/axon-engram.js` now installs SIGTERM/SIGINT handlers, gates new background work while shutting down, drains in-flight requests, deregisters known agents/sessions, and exits 0 with a timeout fallback.
+- Added CI-safe tests:
+  - `tests/test-profile-loading.sh`
+  - `tests/test-model-override.sh`
+  - `tests/test-fleet-spawn.sh`
+  - `tests/test-plugin-unit.mjs`
+  - `tests/test-signal-shutdown.mjs`
+  - `tests/test-worktree.sh`
+- Updated docs/help:
+  - `bin/axon help`
+  - `docs/fleet-requirements.md`
+  - `README.md`
+  - `.claude/CLAUDE.md`
+
+Verified:
+- `tests/test-profile-loading.sh`
+- `tests/test-model-override.sh`
+- `tests/test-fleet-spawn.sh`
+- `node tests/test-plugin-unit.mjs`
+- `node tests/test-signal-shutdown.mjs`
+- `bin/axon --profile cloud-openrouter --model deepseek/deepseek-v4-pro version`
+- `tests/test-worktree.sh` passed only with elevated filesystem permission because the sandbox mounted `.git/worktrees` read-only; behavior was otherwise correct.
+
+Not run:
+- Live OpenRouter run: `bin/axon --profile cloud-openrouter --model deepseek/deepseek-v4-pro run "2+2"`.
+- Live e2e fleet test with real registration/capture/deregistration.
+
+Engram communication blocker:
+- The user asked Codex to join/post updates in `#axon`.
+- Direct HTTP to `localhost:37779/health` failed from the sandbox.
+- Engram MCP identified the current session, but write/read operations returned HTTP 403:
+  - `engram_channel join #axon`
+  - `engram_channel post #axon`
+  - `engram_channel list`
+  - `engram_channel create #axon`
+  - `engram_inbox`
+  - `engram_send to project:axon`
+- Because of this, no channel/direct status update could be sent from this session.
+
+Current follow-up items:
+- Fix Engram MCP/API permissions for this Codex session if channel/inbox/project messaging is required.
+- Run the live OpenRouter one-shot and live fleet e2e once credentials/services are available.
+- Decide whether to add the deferred `axon worker` loop after measuring per-task startup overhead.
 
 ---
 

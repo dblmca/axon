@@ -7,15 +7,51 @@ SCRIPTS="$ROOT/scripts"
 
 # --- Profile selection ---
 PROFILE_NAME="${AXON_PROFILE:-vector-qwen-engram}"
+PROFILE_SPECIFIED=false
+MODEL_OVERRIDE=""
+PROJECT_OVERRIDE=""
+TASK_ID=""
+USE_WORKTREE=false
+AXON_PROJECT_DIR="$PWD"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --profile)
+      PROFILE_SPECIFIED=true
       PROFILE_NAME="$2"
       shift 2
       ;;
     --profile=*)
+      PROFILE_SPECIFIED=true
       PROFILE_NAME="${1#*=}"
+      shift
+      ;;
+    --model)
+      MODEL_OVERRIDE="$2"
+      shift 2
+      ;;
+    --model=*)
+      MODEL_OVERRIDE="${1#*=}"
+      shift
+      ;;
+    --project)
+      PROJECT_OVERRIDE="$2"
+      shift 2
+      ;;
+    --project=*)
+      PROJECT_OVERRIDE="${1#*=}"
+      shift
+      ;;
+    --task)
+      TASK_ID="$2"
+      shift 2
+      ;;
+    --task=*)
+      TASK_ID="${1#*=}"
+      shift
+      ;;
+    --worktree)
+      USE_WORKTREE=true
       shift
       ;;
     *)
@@ -44,13 +80,31 @@ fi
 # --- Env defaults ---
 : "${AXON_QWEN_BASE_URL:=http://192.168.1.153:8081/v1}"
 : "${AXON_QWEN_MODEL_ID:=Qwen3.6-35B-A3B-abliterated-Q4_K_M.gguf}"
+: "${AXON_OPENROUTER_MODEL:=deepseek/deepseek-v4-pro}"
 : "${AXON_ENGRAM_MCP_SERVER:=/home/mmca/mcp-servers/engram-mcp/engram-mcp-server.mjs}"
 : "${AXON_AGENTIC_MCP_SERVER:=/home/mmca/mcp-servers/agentic-mcp/agentic-mcp-server.mjs}"
 : "${ENGRAM_WORKER_URL:=http://localhost:37779}"
 : "${AXON_ENGRAM_MCP_NAMES:=engram,agentic-mcp}"
 
+if [[ -n "$MODEL_OVERRIDE" ]]; then
+  case "$PROFILE_NAME" in
+    cloud-openrouter)
+      export AXON_OPENROUTER_MODEL="$MODEL_OVERRIDE"
+      ;;
+    *)
+      export AXON_QWEN_MODEL_ID="$MODEL_OVERRIDE"
+      ;;
+  esac
+fi
+
+if [[ -n "$PROJECT_OVERRIDE" ]]; then
+  export ENGRAM_PROJECT="$PROJECT_OVERRIDE"
+fi
+
 export AXON_QWEN_BASE_URL AXON_QWEN_MODEL_ID ENGRAM_WORKER_URL
 export AXON_ENGRAM_MCP_SERVER AXON_AGENTIC_MCP_SERVER AXON_ENGRAM_MCP_NAMES
+[[ -n "${AXON_OPENROUTER_MODEL:-}" ]] && export AXON_OPENROUTER_MODEL
+[[ -n "${ENGRAM_PROJECT:-}" ]] && export ENGRAM_PROJECT
 
 # --- Subcommand dispatch ---
 CMD="${1:-}"
@@ -67,7 +121,12 @@ engram_status() {
 }
 
 model_short() {
-  local m="${AXON_QWEN_MODEL_ID%.gguf}"
+  local m
+  if [[ "$PROFILE_NAME" == "cloud-openrouter" ]]; then
+    m="${AXON_OPENROUTER_MODEL:-unset}"
+  else
+    m="${AXON_QWEN_MODEL_ID%.gguf}"
+  fi
   m="${m##*/}"
   echo "$m"
 }
@@ -128,6 +187,27 @@ first_run() {
 }
 
 launch() {
+  [[ -n "${ENGRAM_API_KEY:-}" ]] && export ENGRAM_API_KEY
+  [[ -n "${OPENROUTER_API_KEY:-}" ]] && export OPENROUTER_API_KEY
+  export AXON_PROJECT_DIR
+  export OPENCODE_CONFIG_CONTENT="$(cat "$PROFILE")"
+
+  if [[ "${AXON_DRY_RUN:-}" == "1" || "${AXON_DRY_RUN:-}" == "fail" ]]; then
+    echo "profile: ${PROFILE_NAME}"
+    echo "project_dir: ${AXON_PROJECT_DIR}"
+    [[ -n "${ENGRAM_PROJECT:-}" ]] && echo "project: ${ENGRAM_PROJECT}"
+    if [[ "$PROFILE_NAME" == "cloud-openrouter" ]]; then
+      echo "model: ${AXON_OPENROUTER_MODEL:-}"
+    else
+      echo "model: ${AXON_QWEN_MODEL_ID}"
+    fi
+    printf 'command: bun run dev'
+    printf ' %q' "$@"
+    printf '\n'
+    [[ "${AXON_DRY_RUN:-}" == "fail" ]] && return 1
+    return 0
+  fi
+
   if ! command -v bun >/dev/null 2>&1; then
     echo "bun is required to launch the vendored OpenCode runtime." >&2
     exit 1
@@ -138,12 +218,44 @@ launch() {
     exit 1
   fi
 
-  [[ -n "${ENGRAM_API_KEY:-}" ]] && export ENGRAM_API_KEY
-  [[ -n "${OPENROUTER_API_KEY:-}" ]] && export OPENROUTER_API_KEY
-  export OPENCODE_CONFIG_CONTENT="$(cat "$PROFILE")"
-
   cd "$ROOT/opencode"
   exec bun run dev "$@"
+}
+
+cleanup_worktree() {
+  local exit_code=$?
+  if [[ -n "${WORKTREE_PATH:-}" && -d "$WORKTREE_PATH" ]]; then
+    if [[ $exit_code -eq 0 ]] && [[ -z "$(git -C "$WORKTREE_PATH" status --porcelain 2>/dev/null)" ]]; then
+      git worktree remove "$WORKTREE_PATH" >/dev/null 2>&1 || true
+    else
+      echo "Worktree kept (dirty or failed): $WORKTREE_PATH" >&2
+    fi
+  fi
+}
+
+setup_worktree() {
+  if [[ "$USE_WORKTREE" != true ]]; then
+    return
+  fi
+  if [[ -z "$TASK_ID" ]]; then
+    echo "--worktree requires --task <id>" >&2
+    exit 1
+  fi
+
+  local safe_task
+  safe_task="$(printf '%s' "$TASK_ID" | tr -c 'A-Za-z0-9_.-' '-')"
+  WORKTREE_ROOT="${AXON_WORKTREE_ROOT:-/tmp/axon-worktrees}"
+  WORKTREE_PATH="$WORKTREE_ROOT/task-${safe_task}"
+  mkdir -p "$WORKTREE_ROOT"
+  git -C "$ROOT" worktree add "$WORKTREE_PATH" HEAD >/dev/null 2>&1 || {
+    echo "Failed to create worktree for task $TASK_ID at $WORKTREE_PATH" >&2
+    exit 1
+  }
+  cd "$WORKTREE_PATH"
+  AXON_PROJECT_DIR="$WORKTREE_PATH"
+  export AXON_TASK_ID="$TASK_ID"
+  export AXON_WORKTREE="$WORKTREE_PATH"
+  trap cleanup_worktree EXIT
 }
 
 case "$CMD" in
@@ -157,8 +269,9 @@ case "$CMD" in
       echo "Usage: axon run <prompt>" >&2
       exit 1
     fi
+    setup_worktree
     banner
-    launch run --pure --dangerously-skip-permissions "$@"
+    launch run --dir "$AXON_PROJECT_DIR" --pure --dangerously-skip-permissions "$@"
     ;;
   version|-v|--version)
     echo "axon v${VERSION}"
@@ -186,7 +299,11 @@ case "$CMD" in
     exec bash "$SCRIPTS/axon-status.sh" "$@"
     ;;
   fleet)
-    exec bash "$SCRIPTS/start-axon-fleet.sh" "$@"
+    fleet_args=()
+    [[ "$PROFILE_SPECIFIED" == true ]] && fleet_args+=(--profile "$PROFILE_NAME")
+    [[ -n "$MODEL_OVERRIDE" ]] && fleet_args+=(--model "$MODEL_OVERRIDE")
+    [[ -n "$PROJECT_OVERRIDE" ]] && fleet_args+=(--project "$PROJECT_OVERRIDE")
+    exec bash "$SCRIPTS/start-axon-fleet.sh" "${fleet_args[@]}" "$@"
     ;;
   help|-h|--help)
     cat <<HELP
@@ -207,13 +324,20 @@ Commands:
   help           Show this help
 
 Options:
-  --profile NAME   Select deployment profile (default: vector-qwen-engram)
-                   Available: vector-qwen-engram, remote-engram, cloud-openrouter, minimal-offline
+  --profile NAME    Select deployment profile (default: vector-qwen-engram)
+                    Available: vector-qwen-engram, remote-engram, cloud-openrouter, minimal-offline
+  --model SLUG      Override the selected profile model
+  --project NAME    Override Engram project registration
+  --task ID         Set task id for a run
+  --worktree        Run a task in /tmp/axon-worktrees/task-ID
 
 Environment:
   AXON_PROFILE         Default profile name
+  AXON_WORKTREE_ROOT   Worktree root (default: /tmp/axon-worktrees)
   ENGRAM_API_KEY       Engram authentication (auto-loaded from ~/engram/engram-server/.env)
   AXON_QWEN_BASE_URL   Qwen endpoint (default: http://192.168.1.153:8081/v1)
+  AXON_QWEN_MODEL_ID   Local Qwen model id
+  AXON_OPENROUTER_MODEL OpenRouter model id
   OPENROUTER_API_KEY   Required for cloud-openrouter profile
 HELP
     ;;

@@ -11,22 +11,26 @@ Reference: engram-one-de9d feature request (#2797), engram notes #90 (role defin
 ## R1: Profile-Based Agent Launching
 
 ### R1.1: `start-axon.sh --profile <name>` flag
+Status: implemented via `start-axon.sh` pass-through to `bin/axon`.
 - Accept `--profile <name>` that maps to `profiles/axon.<name>.jsonc`
 - Fall back to `vector-qwen` if no profile specified (current behavior)
 - Validate profile file exists before launching
 - Pass through to `OPENCODE_CONFIG_CONTENT`
 
 ### R1.2: `--model <slug>` override
+Status: implemented in `bin/axon`; local profiles set `AXON_QWEN_MODEL_ID`, cloud profiles set `AXON_OPENROUTER_MODEL`.
 - Accept `--model <provider/model>` that overrides the profile's default model
 - Sets `AXON_OPENROUTER_MODEL` for cloud profiles
 - Sets `AXON_QWEN_MODEL_ID` for local profiles
 - Example: `start-axon.sh --profile cloud-openrouter --model deepseek/deepseek-v4-pro`
 
 ### R1.3: `--project <name>` flag
+Status: implemented in `bin/axon`; the plugin honors `ENGRAM_PROJECT`.
 - Sets `ENGRAM_PROJECT` so the agent registers under the correct project in engram
 - Defaults to directory-based detection (current behavior)
 
 ### R1.4: Fleet launcher profile support
+Status: implemented in `start-axon-fleet.sh`; accepts positional count or `--count`.
 - `start-axon-fleet.sh` accepts `--profile` and `--model` flags
 - Passes them through to each `start-axon.sh` invocation
 - Example: `start-axon-fleet.sh 3 --profile cloud-openrouter --model deepseek/deepseek-v4-pro`
@@ -69,12 +73,14 @@ Reference: engram-one-de9d feature request (#2797), engram notes #90 (role defin
 - Implementation: role instructions define update cadence and format
 
 ### R3.3: Worktree isolation
+Status: implemented in `bin/axon` for `--task <id> --worktree run ...`.
 - Launcher creates `git worktree add` per task before starting agent
 - Agent commits with `[task-{id}]` prefix
 - On completion, worktree is cleaned up or merged
 - Implementation: wrapper in `start-axon.sh` with `--task <id>` and `--worktree` flags
 
 ### R3.4: Shutdown protocol
+Status: SIGTERM/SIGINT handler implemented in the plugin; inbox-driven shutdown remains instruction-based.
 - On receiving `shutdown_request` message via engram inbox:
   1. Finish current tool execution
   2. Send `shutdown_response` message
@@ -140,6 +146,7 @@ Reference: engram-one-de9d feature request (#2797), engram notes #90 (role defin
 ### T1: Tests for Existing Functionality
 
 #### T1.1: Profile injection
+Status: covered by `tests/test-profile-loading.sh` and launcher dry-run checks.
 - Test: Load each profile JSONC, verify valid JSON after stripping comments
 - Test: `OPENCODE_CONFIG_CONTENT` env var is set correctly by launcher scripts
 - Test: Profile env var substitution works (`{env:VARIABLE}` patterns resolve)
@@ -157,6 +164,7 @@ Reference: engram-one-de9d feature request (#2797), engram notes #90 (role defin
 - Test: Stale context is refreshed after TTL
 
 #### T1.4: Tool observation capture
+Status: tool classification covered by `tests/test-plugin-unit.mjs`; full observation capture remains an integration concern.
 - Test: Bash execution → observation posted with type `command`
 - Test: Edit execution → observation posted with type `code_edit`
 - Test: Engram tools are skipped (type `skip`)
@@ -168,6 +176,7 @@ Reference: engram-one-de9d feature request (#2797), engram notes #90 (role defin
 - Test: `--session` continues existing session
 
 #### T1.6: Fleet launcher
+Status: command construction covered by `tests/test-fleet-spawn.sh` with a fake `tmux`.
 - Test: `start-axon-fleet.sh 2` creates 2 tmux sessions
 - Test: Already-running sessions are skipped (not duplicated)
 - Test: Sessions are named `axon-1`, `axon-2`, etc.
@@ -180,15 +189,18 @@ Reference: engram-one-de9d feature request (#2797), engram notes #90 (role defin
 - Test: `start-axon.sh` (no flag) defaults to vector-qwen
 
 #### T2.2: Model override
+Status: covered by `tests/test-model-override.sh`.
 - Test: `--model deepseek/deepseek-v4-pro` sets correct env var
 - Test: Model override propagates through to OpenCode config
 
 #### T2.3: Worktree isolation
+Status: covered by `tests/test-worktree.sh`.
 - Test: `--task 42 --worktree` creates git worktree before launch
 - Test: Agent working directory is the worktree
 - Test: Worktree is cleaned up on agent exit
 
 #### T2.4: Shutdown handler
+Status: covered by `tests/test-signal-shutdown.mjs`.
 - Test: SIGTERM → plugin drains inflight, deregisters, exits 0
 - Test: Graceful shutdown completes within timeout
 

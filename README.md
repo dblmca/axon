@@ -35,6 +35,12 @@ axon --profile minimal-offline
 
 # Start a fleet of N agents in tmux
 axon fleet 4
+
+# Start a cloud fleet with an explicit model and project
+axon fleet 3 --profile cloud-openrouter --model deepseek/deepseek-v4-pro --project axon
+
+# Run a task in an isolated git worktree
+axon --task 42 --worktree run "complete task 42"
 ```
 
 Requires `bun` and a running Engram server (except `minimal-offline` profile).
@@ -96,6 +102,8 @@ Profiles live in `profiles/` as `.jsonc` files. The launcher injects the active 
 | `ENGRAM_API_KEY` | *(required, except minimal-offline)* |
 | `AXON_QWEN_BASE_URL` | `http://192.168.1.153:8081/v1` |
 | `AXON_QWEN_MODEL_ID` | `Qwen3.6-35B-A3B-abliterated-Q4_K_M.gguf` |
+| `AXON_OPENROUTER_MODEL` | `deepseek/deepseek-v4-pro` |
+| `AXON_WORKTREE_ROOT` | `/tmp/axon-worktrees` |
 | `ENGRAM_WORKER_URL` | `http://localhost:37779` |
 | `OPENROUTER_API_KEY` | *(required for cloud profile)* |
 
@@ -119,7 +127,9 @@ Sprint 4 closed all Phase 2 and Phase 3 gaps from the architecture: assistant-re
 
 Sprint 5 added tmux-based persistent sessions and fleet management, plus a status dashboard.
 
-Sprint 6 added the `bin/axon` CLI wrapper (profile auto-detection, ENGRAM_API_KEY auto-load, subcommands), `.axon/instructions.md` for per-project system instructions, graceful shutdown with HTTP request draining, and fixed MCP tool visibility so Qwen can discover and call engram tools. Two Phase 4 items remain (UX rebrand and native coordination affordances).
+Sprint 6 added the `bin/axon` CLI wrapper (profile auto-detection, ENGRAM_API_KEY auto-load, subcommands), `.axon/instructions.md` for per-project system instructions, graceful shutdown with HTTP request draining, and fixed MCP tool visibility so Qwen can discover and call engram tools.
+
+Sprint 7 wired Axon for fleet spawning: `--model` and `--project` pass-through, tmux launchers use `bin/axon`, task worktrees are created and cleaned up by the launcher, and the plugin deregisters agents on SIGTERM/SIGINT.
 
 The agents that built Axon are the same kind of agents Axon is designed to run.
 

@@ -17,6 +17,8 @@ const AGENT_SHORT_ID = crypto.randomBytes(2).toString("hex")
 
 const sessionState = new Map()
 const inflight = new Set()
+let shuttingDown = false
+let shutdownHandlersInstalled = false
 
 function hostname() {
   return process.env.CLIENT_HOSTNAME || process.env.HOSTNAME || os.hostname()
@@ -60,7 +62,7 @@ function asRecord(value) {
 }
 
 function projectName(input) {
-  return input.project.name || path.basename(input.worktree || input.directory)
+  return process.env.ENGRAM_PROJECT || input.project.name || path.basename(input.worktree || input.directory)
 }
 
 function mcpNames(options) {
@@ -284,6 +286,7 @@ function log(input, level, message, extra = {}) {
 }
 
 function background(input, promise, message, extra = {}) {
+  if (shuttingDown) return
   const tracked = promise.catch((error) => log(input, "WARN", message, { ...extra, error: errorMessage(error) }))
   inflight.add(tracked)
   tracked.finally(() => inflight.delete(tracked))
@@ -326,6 +329,42 @@ async function request(runtime, endpoint, init = {}) {
   } finally {
     clearTimeout(timeout)
   }
+}
+
+function installShutdownHandlers(input, runtime) {
+  if (shutdownHandlersInstalled) return
+  shutdownHandlersInstalled = true
+
+  const handleShutdown = (signal) => {
+    if (shuttingDown) return
+    shuttingDown = true
+
+    const timeout = setTimeout(() => process.exit(1), DRAIN_TIMEOUT_MS + 1_000)
+    timeout.unref?.()
+
+    ;(async () => {
+      await drain(input)
+      const deregistrations = []
+      for (const [sessionID, current] of sessionState) {
+        if (!current.agentName) continue
+        deregistrations.push(
+          request(runtime, "/api/agents/deregister", {
+            method: "POST",
+            body: {
+              name: current.agentName,
+              session_id: sessionID,
+            },
+          }).catch(() => {}),
+        )
+      }
+      await Promise.allSettled(deregistrations)
+      clearTimeout(timeout)
+      process.exit(0)
+    })().catch(() => process.exit(1))
+  }
+
+  process.on("SIGTERM", () => handleShutdown("SIGTERM"))
+  process.on("SIGINT", () => handleShutdown("SIGINT"))
 }
 
 async function postObservation(runtime, sessionID, body) {
@@ -531,6 +570,7 @@ export default {
   id: "axon.engram",
   server: async (input, options) => {
     const runtime = config(options)
+    installShutdownHandlers(input, runtime)
 
     process.on("beforeExit", () => {
       if (inflight.size > 0) drain(input)
@@ -749,4 +789,13 @@ export default {
       },
     }
   },
+}
+
+export {
+  capabilities,
+  config,
+  contextBlock,
+  projectName,
+  state,
+  toolType,
 }
