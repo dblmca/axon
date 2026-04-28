@@ -293,6 +293,7 @@ case "$CMD" in
     AXON_SESSION_ID="ses_$(date +%s%N | head -c13)$(head -c6 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c10)"
     AXON_PROJECT="${ENGRAM_PROJECT:-$(basename "$AXON_PROJECT_DIR")}"
     export AXON_SESSION_ID AXON_PROJECT
+    export OPENCODE_CONFIG_DIR="$ROOT/opencode/.opencode"
     if [[ -n "${ENGRAM_API_KEY:-}" && -n "${ENGRAM_WORKER_URL:-}" ]]; then
       curl -sf "${ENGRAM_WORKER_URL}/api/sessions/init" \
         -H "x-api-key: ${ENGRAM_API_KEY}" -H "Content-Type: application/json" \
