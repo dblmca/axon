@@ -299,7 +299,7 @@ case "$CMD" in
         -d "{\"sdk_session_id\":\"${AXON_SESSION_ID}\",\"project\":\"${AXON_PROJECT}\",\"source_ai\":\"axon\",\"client_hostname\":\"$(hostname)\"}" \
         >/dev/null 2>&1 || true
     fi
-    launch run --dir "$AXON_PROJECT_DIR" --pure --dangerously-skip-permissions "$@"
+    launch run --dir "$AXON_PROJECT_DIR" --dangerously-skip-permissions "$@"
     RUN_EXIT=$?
     # Complete engram session after run
     if [[ -n "${ENGRAM_API_KEY:-}" && -n "${ENGRAM_WORKER_URL:-}" ]]; then
