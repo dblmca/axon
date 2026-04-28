@@ -293,7 +293,15 @@ case "$CMD" in
     AXON_SESSION_ID="ses_$(date +%s%N | head -c13)$(head -c6 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c10)"
     AXON_PROJECT="${ENGRAM_PROJECT:-$(basename "$AXON_PROJECT_DIR")}"
     export AXON_SESSION_ID AXON_PROJECT
-    export OPENCODE_CONFIG_DIR="$ROOT/opencode/.opencode"
+    # Ensure axon-engram plugin is discoverable in the target project dir
+    AXON_PLUGIN_SRC="$ROOT/opencode/.opencode/plugin"
+    AXON_PLUGIN_DST="$AXON_PROJECT_DIR/.opencode/plugin"
+    AXON_PLUGIN_CLEANUP=""
+    if [[ -d "$AXON_PLUGIN_SRC" && ! -e "$AXON_PLUGIN_DST" ]]; then
+      mkdir -p "$AXON_PROJECT_DIR/.opencode"
+      ln -sfn "$AXON_PLUGIN_SRC" "$AXON_PLUGIN_DST"
+      AXON_PLUGIN_CLEANUP="$AXON_PLUGIN_DST"
+    fi
     if [[ -n "${ENGRAM_API_KEY:-}" && -n "${ENGRAM_WORKER_URL:-}" ]]; then
       curl -sf "${ENGRAM_WORKER_URL}/api/sessions/init" \
         -H "x-api-key: ${ENGRAM_API_KEY}" -H "Content-Type: application/json" \
@@ -302,7 +310,8 @@ case "$CMD" in
     fi
     launch run --dir "$AXON_PROJECT_DIR" --dangerously-skip-permissions "$@"
     RUN_EXIT=$?
-    # Complete engram session after run
+    # Cleanup symlink + complete engram session
+    [[ -n "$AXON_PLUGIN_CLEANUP" ]] && rm -f "$AXON_PLUGIN_CLEANUP"
     if [[ -n "${ENGRAM_API_KEY:-}" && -n "${ENGRAM_WORKER_URL:-}" ]]; then
       curl -sf "${ENGRAM_WORKER_URL}/api/sessions/${AXON_SESSION_ID}/complete" \
         -X POST -H "x-api-key: ${ENGRAM_API_KEY}" -H "Content-Type: application/json" \
