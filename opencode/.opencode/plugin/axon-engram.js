@@ -466,6 +466,14 @@ function budgetAppend(lines, budget, section, items, render, maxItems = 3) {
   return remaining
 }
 
+function taskDescription(sessionID) {
+  const taskId = process.env.AXON_TASK_ID || ""
+  const current = state(sessionID)
+  if (current._taskDescription) return current._taskDescription
+  if (taskId) return `Orchestrated task ${taskId}`
+  return ""
+}
+
 async function contextBlock(input, runtime, sessionID) {
   const current = state(sessionID)
   if (current.context && current.contextExpiresAt > Date.now()) return current.context
@@ -474,37 +482,32 @@ async function contextBlock(input, runtime, sessionID) {
 
   const project = projectName(input)
   const agent = current.agentName || agentName(input, runtime)
-  const [ctx, inbox, instincts, tasks] = await Promise.all([
-    request(runtime, "/api/search/context", {
+  const taskDesc = taskDescription(sessionID)
+
+  const [sandwich, inbox, tasks] = await Promise.all([
+    request(runtime, "/api/search/sandwich", {
       method: "POST",
       body: {
         project,
-        query: project,
-        session_limit: 4,
-        observation_limit: 6,
+        task_description: taskDesc || project,
+        files: Array.from(current.filesModified).slice(0, 10),
+        budget_tokens: 2000,
       },
-    }),
+    }).catch(() => ({ ok: false, status: 0 })),
     request(runtime, `/api/agents/messages/inbox?name=${encodeURIComponent(agent)}&unread_only=true&limit=5`),
-    request(
-      runtime,
-      `/api/instincts?project=${encodeURIComponent(project)}&min_confidence=0.7&limit=3`,
-    ).catch(() => ({ ok: false, status: 0 })),
     request(
       runtime,
       `/api/tasks?project=${encodeURIComponent(project)}&assigned_to=${encodeURIComponent(agent)}`,
     ).catch(() => ({ ok: false, status: 0 })),
   ])
 
-  const data = ctx.data || {}
   const unread = Array.isArray(inbox.data?.messages) ? inbox.data.messages : []
-  const learned = Array.isArray(instincts.data?.instincts) ? instincts.data.instincts : []
   const allTasks = Array.isArray(tasks.data?.tasks) ? tasks.data.tasks : (Array.isArray(tasks.data) ? tasks.data : [])
   const pendingTasks = allTasks.filter((t) => t.status !== "done" && t.status !== "cancelled")
 
-  const freshDecisions = (Array.isArray(data.recent_decisions) ? data.recent_decisions : [])
-    .filter((d) => daysOld(d.created_at || d.date) < DECISION_MAX_AGE_DAYS)
-  const freshObservations = (Array.isArray(data.relevant_observations) ? data.relevant_observations : [])
-    .filter((o) => daysOld(o.created_at || o.date) < OBSERVATION_MAX_AGE_DAYS)
+  if (pendingTasks.length && !current._taskDescription) {
+    current._taskDescription = pendingTasks[0].description || pendingTasks[0].title || ""
+  }
 
   const statusParts = [`inbox: ${unread.length} unread`, `tasks: ${pendingTasks.length} pending`]
   const lines = [
@@ -519,26 +522,22 @@ async function contextBlock(input, runtime, sessionID) {
   remaining = budgetAppend(lines, remaining, "Inbox (act on these)", unread, (item) =>
     `- ${cleanText(item.sender, 60)}: ${cleanText(item.content, 200)}`, 5)
 
-  remaining = budgetAppend(lines, remaining, "Recent Decisions", freshDecisions, (item) => {
-    const why = cleanText(item.rationale, 100)
-    return `- ${cleanText(item.chosen, 140)}${why ? ` — ${why}` : ""}`
-  }, 3)
+  // Sandwich context — instincts, decisions, semantic memory, wiki, failures
+  if (sandwich.ok && sandwich.data?.context_markdown) {
+    const sandwichText = sandwich.data.context_markdown
+    const cost = sandwichText.length + 20
+    if (remaining - cost > 0) {
+      lines.push("\n### Project Knowledge (auto-loaded)")
+      lines.push(sandwichText)
+      remaining -= cost
+      if (sandwich.data.truncated) lines.push("_(context truncated to fit budget)_")
+    }
+  }
 
-  remaining = budgetAppend(lines, remaining, "Sessions", data.recent_sessions, (item) => {
-    const summary = cleanText(item.request || item.completed || item.note || "", 140)
-    return `- ${cleanText(item.status || "recent", 16)} | ${cleanText(item.date || "", 10)} | ${summary}`
-  }, 3)
-
-  remaining = budgetAppend(lines, remaining, "Related Work", freshObservations, (item) => {
-    const relevance = Number.isFinite(item.relevance) ? ` (${item.relevance}%)` : ""
-    return `- ${cleanText(item.title, 140)}${relevance}`
-  }, 4)
-
-  budgetAppend(lines, remaining, "Learned Patterns", learned, (item) => {
-    const trigger = cleanText(item.trigger_pattern, 70)
-    const action = cleanText(item.action, 100)
-    return `- ${trigger || "pattern"}${action ? ` -> ${action}` : ""}`
-  }, 3)
+  // Pending tasks
+  remaining = budgetAppend(lines, remaining, "Pending Tasks", pendingTasks, (item) => {
+    return `- [${item.id}] ${cleanText(item.title, 120)} (${item.status})`
+  }, 5)
 
   lines.push(
     "",
@@ -557,6 +556,33 @@ async function contextBlock(input, runtime, sessionID) {
   current.context = lines.join("\n")
   current.contextExpiresAt = Date.now() + Math.max(5_000, runtime.contextTtlMs || DEFAULT_CONTEXT_TTL_MS)
   return current.context
+}
+
+async function postVerify(input, runtime, sessionID) {
+  const current = state(sessionID)
+  const files = Array.from(current.filesModified)
+  if (!files.length) return
+
+  const project = projectName(input)
+  const taskDesc = taskDescription(sessionID) || `Session work in ${project}`
+
+  const result = await request(runtime, "/api/search/verify", {
+    method: "POST",
+    body: {
+      project,
+      task_description: taskDesc,
+      files_changed: files.slice(0, 50),
+      agent_name: current.agentName || agentName(input, runtime),
+    },
+  })
+
+  if (result.ok && result.data && !result.data.clear && Array.isArray(result.data.concerns)) {
+    const concerns = result.data.concerns
+    await log(input, "WARN", `Post-verification found ${concerns.length} concern(s)`, {
+      sessionID,
+      concerns: concerns.map((c) => `[${c.severity}] ${c.description}`),
+    })
+  }
 }
 
 function sessionIDFromEvent(event, kind) {
@@ -602,25 +628,28 @@ export default {
 
         background(
           input,
-          Promise.allSettled([
-            request(runtime, `/api/sessions/${deleted}/summarize`, {
-              method: "POST",
-              body: {
-                summary,
-                metadata: { prompts, tools, files },
-              },
-            }),
-            request(runtime, `/api/sessions/${deleted}/complete`, { method: "POST", body: {} }),
-            current.agentName
-              ? request(runtime, "/api/agents/deregister", {
-                  method: "POST",
-                  body: {
-                    name: current.agentName,
-                    session_id: deleted,
-                  },
-                })
-              : Promise.resolve({ ok: false, status: 0 }),
-          ]),
+          (async () => {
+            await postVerify(input, runtime, deleted).catch(() => {})
+            await Promise.allSettled([
+              request(runtime, `/api/sessions/${deleted}/summarize`, {
+                method: "POST",
+                body: {
+                  summary,
+                  metadata: { prompts, tools, files },
+                },
+              }),
+              request(runtime, `/api/sessions/${deleted}/complete`, { method: "POST", body: {} }),
+              current.agentName
+                ? request(runtime, "/api/agents/deregister", {
+                    method: "POST",
+                    body: {
+                      name: current.agentName,
+                      session_id: deleted,
+                    },
+                  })
+                : Promise.resolve({ ok: false, status: 0 }),
+            ])
+          })(),
           "failed to finalize Engram session",
           { sessionID: deleted },
         )
@@ -795,6 +824,7 @@ export {
   capabilities,
   config,
   contextBlock,
+  postVerify,
   projectName,
   state,
   toolType,
