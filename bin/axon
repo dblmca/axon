@@ -237,7 +237,7 @@ launch() {
   fi
 
   cd "$ROOT/opencode"
-  exec bun run dev "$@"
+  bun run dev "$@"
 }
 
 cleanup_worktree() {
@@ -289,7 +289,25 @@ case "$CMD" in
     fi
     setup_worktree
     banner
+    # Init engram session before OpenCode run (plugin may not fire in headless mode)
+    AXON_SESSION_ID="ses_$(date +%s%N | head -c13)$(head -c6 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c10)"
+    AXON_PROJECT="${ENGRAM_PROJECT:-$(basename "$AXON_PROJECT_DIR")}"
+    export AXON_SESSION_ID AXON_PROJECT
+    if [[ -n "${ENGRAM_API_KEY:-}" && -n "${ENGRAM_WORKER_URL:-}" ]]; then
+      curl -sf "${ENGRAM_WORKER_URL}/api/sessions/init" \
+        -H "x-api-key: ${ENGRAM_API_KEY}" -H "Content-Type: application/json" \
+        -d "{\"sdk_session_id\":\"${AXON_SESSION_ID}\",\"project\":\"${AXON_PROJECT}\",\"source_ai\":\"axon\",\"client_hostname\":\"$(hostname)\"}" \
+        >/dev/null 2>&1 || true
+    fi
     launch run --dir "$AXON_PROJECT_DIR" --pure --dangerously-skip-permissions "$@"
+    RUN_EXIT=$?
+    # Complete engram session after run
+    if [[ -n "${ENGRAM_API_KEY:-}" && -n "${ENGRAM_WORKER_URL:-}" ]]; then
+      curl -sf "${ENGRAM_WORKER_URL}/api/sessions/${AXON_SESSION_ID}/complete" \
+        -X POST -H "x-api-key: ${ENGRAM_API_KEY}" -H "Content-Type: application/json" \
+        -d '{}' >/dev/null 2>&1 || true
+    fi
+    exit $RUN_EXIT
     ;;
   version|-v|--version)
     echo "axon v${VERSION}"
