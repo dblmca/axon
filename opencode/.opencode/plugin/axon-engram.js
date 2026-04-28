@@ -410,8 +410,13 @@ async function syncAgent(input, runtime, sessionID) {
   ])
 }
 
+function resolveSessionID(sessionID) {
+  return process.env.AXON_SESSION_ID || sessionID
+}
+
 async function ensureSession(input, runtime, sessionID) {
-  const current = state(sessionID)
+  const effectiveID = resolveSessionID(sessionID)
+  const current = state(effectiveID)
   if (current.initialized) return current
   if (current.initializing) return current.initializing
 
@@ -421,8 +426,8 @@ async function ensureSession(input, runtime, sessionID) {
     const init = await request(runtime, "/api/sessions/init", {
       method: "POST",
       body: {
-        sdk_session_id: sessionID,
-        ai_session_id: sessionID,
+        sdk_session_id: effectiveID,
+        ai_session_id: effectiveID,
         source_ai: SOURCE_AI,
         project,
         client_hostname: hostname(),
@@ -657,13 +662,14 @@ export default {
         sessionState.delete(deleted)
       },
 
-      "chat.message": async ({ sessionID, model }, output) => {
+      "chat.message": async ({ sessionID: rawSessionID, model }, output) => {
         if (!runtime.enabled || !runtime.apiKey) return
         if (output.message.role !== "user") return
 
         const text = promptText(output.parts)
         if (!text) return
 
+        const sessionID = resolveSessionID(rawSessionID)
         const current = state(sessionID)
         const changedModel = noteModel(sessionID, model)
         const prompt_number = current.promptNumber + 1
@@ -696,12 +702,13 @@ export default {
         )
       },
 
-      "tool.execute.after": async ({ tool, sessionID, args }, output) => {
+      "tool.execute.after": async ({ tool, sessionID: rawSessionID, args }, output) => {
         if (!runtime.enabled || !runtime.apiKey) return
 
         const type = toolType(tool, args)
         if (type === "skip") return
 
+        const sessionID = resolveSessionID(rawSessionID)
         const current = state(sessionID)
         current.toolsUsed.add(String(tool))
         if (type === "code_edit") {
@@ -735,11 +742,12 @@ export default {
         )
       },
 
-      "experimental.text.complete": async ({ sessionID, messageID, partID }, output) => {
+      "experimental.text.complete": async ({ sessionID: rawSessionID, messageID, partID }, output) => {
         if (!runtime.enabled || !runtime.apiKey || !runtime.captureResponses) return
         const text = String(output.text || "").trim()
         if (!text) return
 
+        const sessionID = resolveSessionID(rawSessionID)
         const current = state(sessionID)
         const llm = activeModel(runtime, current)
         const label = modelLabel(runtime, llm)
@@ -770,7 +778,8 @@ export default {
         )
       },
 
-      "shell.env": async ({ sessionID }, output) => {
+      "shell.env": async ({ sessionID: rawSessionID }, output) => {
+        const sessionID = resolveSessionID(rawSessionID)
         const project = projectName(input)
         output.env.AXON = "1"
         output.env.ENGRAM_PROJECT = project
@@ -790,7 +799,8 @@ export default {
         if (llmLabel) output.env.AXON_MODEL_LABEL = llmLabel
       },
 
-      "experimental.chat.system.transform": async ({ sessionID, model }, output) => {
+      "experimental.chat.system.transform": async ({ sessionID: rawSessionID, model }, output) => {
+        const sessionID = resolveSessionID(rawSessionID)
         const instructions = loadInstructions(input.worktree)
         if (instructions) output.system.push(instructions)
 
