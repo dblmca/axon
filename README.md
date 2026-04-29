@@ -104,6 +104,14 @@ Profiles live in `profiles/` as `.jsonc` files. The launcher injects the active 
 | `AXON_QWEN_MODEL_ID` | `Qwen3.6-35B-A3B-abliterated-Q4_K_M.gguf` |
 | `AXON_OPENROUTER_MODEL` | `deepseek/deepseek-v4-pro` |
 | `AXON_WORKTREE_ROOT` | `/tmp/axon-worktrees` |
+| `AXON_AGENT_ROLE` / `ENGRAM_AGENT_ROLE` | `implementation_worker` |
+| `AXON_MODEL_CLASS` / `ENGRAM_MODEL_CLASS` | inferred from active model |
+| `AXON_MODEL_TIER` / `ENGRAM_MODEL_TIER` | inferred from active model |
+| `AXON_COST_TIER` / `ENGRAM_COST_TIER` | inferred from active model |
+| `AXON_AGENT_CAPABILITIES` / `ENGRAM_AGENT_CAPABILITIES` | comma-separated extra capability tags |
+| `AXON_AGENT_SKILLS` / `ENGRAM_AGENT_SKILLS` | comma-separated skill tags |
+| `AXON_AGENT_LIMITS` / `ENGRAM_AGENT_LIMITS` | JSON limits object/array |
+| `AXON_RELEASE_AGENT_EXEMPT` / `ENGRAM_RELEASE_AGENT_EXEMPT` | `true` for out-of-pool release agents |
 | `ENGRAM_WORKER_URL` | `http://localhost:37779` |
 | `OPENROUTER_API_KEY` | *(required for cloud profile)* |
 

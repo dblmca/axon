@@ -199,22 +199,165 @@ function title(tool, args, type) {
   return `${tool} executed`
 }
 
-let cachedAgentConfig
+const cachedAgentConfig = new Map()
 
 function loadAgentConfig(worktree) {
-  if (cachedAgentConfig !== undefined) return cachedAgentConfig
+  const key = path.resolve(worktree || ".")
+  if (cachedAgentConfig.has(key)) return cachedAgentConfig.get(key)
   for (const rel of [".axon/engram-agent.json", ".opencode/engram-agent.json"]) {
-    const full = path.join(worktree, rel)
+    const full = path.join(key, rel)
     try {
       const parsed = JSON.parse(fs.readFileSync(full, "utf8"))
       if (parsed && typeof parsed === "object") {
-        cachedAgentConfig = parsed
-        return cachedAgentConfig
+        cachedAgentConfig.set(key, parsed)
+        return parsed
       }
     } catch {}
   }
-  cachedAgentConfig = null
+  cachedAgentConfig.set(key, null)
   return null
+}
+
+function firstText(...values) {
+  for (const value of values) {
+    const text = String(value ?? "").trim()
+    if (text) return text
+  }
+  return ""
+}
+
+function envText(...names) {
+  return firstText(...names.map((name) => process.env[name]))
+}
+
+function splitList(value) {
+  if (!value) return []
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean)
+  return String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function uniqueList(...values) {
+  return Array.from(new Set(values.flatMap(splitList))).filter(Boolean)
+}
+
+function parseJsonish(value) {
+  if (value === undefined || value === null || value === "") return undefined
+  if (typeof value !== "string") return value
+  try {
+    return JSON.parse(value)
+  } catch {
+    return undefined
+  }
+}
+
+function boolish(value) {
+  if (value === undefined || value === null || value === "") return undefined
+  if (typeof value === "boolean") return value
+  const text = String(value).trim().toLowerCase()
+  if (["1", "true", "yes", "on"].includes(text)) return true
+  if (["0", "false", "no", "off"].includes(text)) return false
+  return undefined
+}
+
+function numberish(value) {
+  const text = String(value ?? "").trim()
+  if (!text || !/^\d+$/.test(text)) return undefined
+  return Number(text)
+}
+
+function configCapabilities(agentCfg) {
+  const value = agentCfg?.capabilities
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {}
+}
+
+function inferredModel(runtime, current) {
+  const llm = activeModel(runtime, current)
+  const label = modelLabel(runtime, llm)
+  const raw = firstText(
+    label,
+    runtime.modelID,
+    process.env.AXON_OPENROUTER_MODEL,
+    process.env.AXON_DEEPSEEK_MODEL,
+    process.env.AXON_QWEN_MODEL_ID,
+  )
+  const lower = raw.toLowerCase()
+  if (lower.includes("deepseek-v4-pro")) return { className: "deepseek-v4-pro", tier: 3, cost: 2 }
+  if (lower.includes("deepseek-v4-flash")) return { className: "deepseek-v4-flash", tier: 2, cost: 1 }
+  if (lower.includes("deepseek")) return { className: "deepseek", tier: 3, cost: 2 }
+  if (lower.includes("qwen3") || lower.includes("qwen")) return { className: "qwen3", tier: 2, cost: 1 }
+  if (lower.includes("openrouter")) return { className: "openrouter", tier: 3, cost: 3 }
+  return { className: "axon", tier: 2, cost: 1 }
+}
+
+function withReleaseLimit(limits, releaseAgentExempt) {
+  if (!releaseAgentExempt) return limits
+  if (Array.isArray(limits) || typeof limits === "string") return uniqueList(limits, "pool_exempt_release_agent")
+  if (limits && typeof limits === "object") return { ...limits, release_agent_exempt: true }
+  return ["pool_exempt_release_agent"]
+}
+
+function agentProfile(agentCfg, runtime, current) {
+  const cfgCaps = configCapabilities(agentCfg)
+  const inferred = inferredModel(runtime, current)
+  const role = firstText(
+    envText("ENGRAM_AGENT_ROLE", "AXON_AGENT_ROLE", "ORCA_AGENT_ROLE"),
+    agentCfg?.agent_role,
+    agentCfg?.role,
+    cfgCaps.agent_role,
+    cfgCaps.role,
+    "implementation_worker",
+  )
+  const modelClass = firstText(
+    envText("ENGRAM_MODEL_CLASS", "AXON_MODEL_CLASS", "ORCA_MODEL_CLASS"),
+    agentCfg?.model_class,
+    cfgCaps.model_class,
+    inferred.className,
+  )
+  const modelTier = numberish(envText("ENGRAM_MODEL_TIER", "AXON_MODEL_TIER", "ORCA_MODEL_TIER"))
+    ?? numberish(agentCfg?.model_tier)
+    ?? numberish(cfgCaps.model_tier)
+    ?? inferred.tier
+  const costTier = numberish(envText("ENGRAM_COST_TIER", "AXON_COST_TIER", "ORCA_COST_TIER"))
+    ?? numberish(agentCfg?.cost_tier)
+    ?? numberish(cfgCaps.cost_tier)
+    ?? inferred.cost
+  const releaseAgentExempt = boolish(envText("ENGRAM_RELEASE_AGENT_EXEMPT", "AXON_RELEASE_AGENT_EXEMPT", "ORCA_RELEASE_AGENT_EXEMPT"))
+    ?? boolish(agentCfg?.release_agent_exempt)
+    ?? boolish(cfgCaps.release_agent_exempt)
+    ?? role === "release_agent"
+
+  const limits = parseJsonish(envText("ENGRAM_AGENT_LIMITS", "AXON_AGENT_LIMITS", "ORCA_AGENT_LIMITS"))
+    ?? agentCfg?.limits
+    ?? cfgCaps.limits
+    ?? []
+  const normalizedLimits = withReleaseLimit(limits, releaseAgentExempt)
+
+  return {
+    role,
+    agent_role: role,
+    model_class: modelClass,
+    model_tier: modelTier,
+    cost_tier: costTier,
+    capabilities: uniqueList(
+      "code_edit",
+      "mcp_tools",
+      "engram_memory",
+      agentCfg?.agent_capabilities,
+      Array.isArray(agentCfg?.capabilities) ? agentCfg.capabilities : undefined,
+      cfgCaps.capabilities,
+      envText("ENGRAM_AGENT_CAPABILITIES", "AXON_AGENT_CAPABILITIES", "ORCA_AGENT_CAPABILITIES"),
+    ),
+    skills: uniqueList(
+      agentCfg?.skills,
+      cfgCaps.skills,
+      envText("ENGRAM_AGENT_SKILLS", "AXON_AGENT_SKILLS", "ORCA_AGENT_SKILLS"),
+    ),
+    limits: normalizedLimits,
+    release_agent_exempt: releaseAgentExempt,
+  }
 }
 
 function capabilities(input, runtime, current) {
@@ -229,13 +372,15 @@ function capabilities(input, runtime, current) {
     } catch {}
   }
   const agentCfg = loadAgentConfig(input.worktree)
-  const cfgCaps = agentCfg?.capabilities || {}
+  const cfgCaps = configCapabilities(agentCfg)
+  const profile = agentProfile(agentCfg, runtime, current)
   const llm = activeModel(runtime, current)
   const label = modelLabel(runtime, llm) || cfgCaps.model || SOURCE_AI
   return {
     source_ai: agentCfg?.source_ai || SOURCE_AI,
     mcp_servers: Array.from(new Set([...runtime.mcpNames, ...local])).slice(0, 30),
     model: label,
+    ...profile,
     ...(llm
       ? {
           llm: {
@@ -249,22 +394,24 @@ function capabilities(input, runtime, current) {
   }
 }
 
-let cachedInstructions
+const cachedInstructions = new Map()
 
 function loadInstructions(worktree) {
-  if (cachedInstructions !== undefined) return cachedInstructions
+  const key = path.resolve(worktree || ".")
+  if (cachedInstructions.has(key)) return cachedInstructions.get(key)
   for (const rel of [".axon/instructions.md", ".opencode/instructions.md"]) {
-    const full = path.join(worktree, rel)
+    const full = path.join(key, rel)
     try {
       const text = fs.readFileSync(full, "utf8").trim()
       if (text) {
-        cachedInstructions = `<axon-instructions>\n${text}\n</axon-instructions>`
-        return cachedInstructions
+        const wrapped = `<axon-instructions>\n${text}\n</axon-instructions>`
+        cachedInstructions.set(key, wrapped)
+        return wrapped
       }
     } catch {}
   }
-  cachedInstructions = ""
-  return cachedInstructions
+  cachedInstructions.set(key, "")
+  return ""
 }
 
 function agentName(input, runtime) {
