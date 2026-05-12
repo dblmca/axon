@@ -15,7 +15,7 @@
       "options": {
         "baseURL": "https://openrouter.ai/api/v1",
         "apiKey": "{env:OPENROUTER_API_KEY}",
-        "timeout": 120000
+        "timeout": 600000
       },
       "models": {
         "deepseek/deepseek-v4-pro": {
@@ -66,6 +66,22 @@
             "output": ["text"]
           }
         },
+        "moonshotai/kimi-k2.6": {
+          "name": "Kimi K2.6",
+          "family": "kimi",
+          "attachment": true,
+          "reasoning": true,
+          "temperature": true,
+          "tool_call": true,
+          "limit": {
+            "context": 262144,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        },
         "qwen/qwen3-coder": {
           "name": "Qwen3 Coder",
           "family": "qwen",
@@ -76,6 +92,22 @@
           "limit": {
             "context": 131072,
             "output": 8192
+          },
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          }
+        },
+        "xiaomi/mimo-v2.5-pro": {
+          "name": "MiMo V2.5 Pro",
+          "family": "mimo",
+          "attachment": true,
+          "reasoning": true,
+          "temperature": true,
+          "tool_call": true,
+          "limit": {
+            "context": 1048576,
+            "output": 16384
           },
           "modalities": {
             "input": ["text"],
@@ -124,7 +156,9 @@
     "engram_dashboard": "allow",
     "engram_notify": "allow",
     "engram_forget": "allow",
-    "engram_instincts": "allow"
+    "engram_instincts": "allow",
+
+    "jcodemunch_*": "allow"
   },
 
   "mcp": {
@@ -142,6 +176,12 @@
     "agentic-mcp": {
       "type": "local",
       "command": ["node", "{env:AXON_AGENTIC_MCP_SERVER}"],
+      "enabled": true,
+      "timeout": 10000
+    },
+    "jcodemunch": {
+      "type": "local",
+      "command": ["/home/mmca/envs/jcodemunch/bin/jcodemunch-mcp", "serve"],
       "enabled": true,
       "timeout": 10000
     }
