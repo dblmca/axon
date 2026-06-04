@@ -20,6 +20,7 @@ MODEL_OVERRIDE=""
 PROJECT_OVERRIDE=""
 TASK_ID=""
 USE_WORKTREE=false
+SKIP_PERMISSIONS=false
 AXON_PROJECT_DIR="$PWD"
 
 while [[ $# -gt 0 ]]; do
@@ -60,6 +61,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --worktree)
       USE_WORKTREE=true
+      shift
+      ;;
+    --yes|--skip-permissions|--dangerously-skip-permissions)
+      SKIP_PERMISSIONS=true
       shift
       ;;
     *)
@@ -144,6 +149,13 @@ model_short() {
   fi
   m="${m##*/}"
   echo "$m"
+}
+
+skip_permissions_enabled() {
+  case "${AXON_SKIP_PERMISSIONS:-}" in
+    1|true|TRUE|yes|YES|on|ON) return 0 ;;
+  esac
+  [[ "$SKIP_PERMISSIONS" == true ]]
 }
 
 banner() {
@@ -283,6 +295,22 @@ case "$CMD" in
     launch "$@"
     ;;
   run)
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --yes|--skip-permissions|--dangerously-skip-permissions)
+          SKIP_PERMISSIONS=true
+          shift
+          ;;
+        --)
+          shift
+          break
+          ;;
+        *)
+          break
+          ;;
+      esac
+    done
+
     if [[ $# -eq 0 ]]; then
       echo "Usage: axon run <prompt>" >&2
       exit 1
@@ -308,7 +336,11 @@ case "$CMD" in
         -d "{\"sdk_session_id\":\"${AXON_SESSION_ID}\",\"project\":\"${AXON_PROJECT}\",\"source_ai\":\"axon\",\"client_hostname\":\"$(hostname)\"}" \
         >/dev/null 2>&1 || true
     fi
-    launch run --dir "$AXON_PROJECT_DIR" --dangerously-skip-permissions "$@"
+    run_args=(run --dir "$AXON_PROJECT_DIR")
+    if skip_permissions_enabled; then
+      run_args+=(--dangerously-skip-permissions)
+    fi
+    launch "${run_args[@]}" "$@"
     RUN_EXIT=$?
     # Cleanup symlink + complete engram session
     [[ -n "$AXON_PLUGIN_CLEANUP" ]] && rm -f "$AXON_PLUGIN_CLEANUP"
@@ -376,6 +408,7 @@ Options:
   --project NAME    Override Engram project registration
   --task ID         Set task id for a run
   --worktree        Run a task in /tmp/axon-worktrees/task-ID
+  --yes             Auto-approve headless run permissions
 
 Environment:
   AXON_PROFILE         Default profile name
@@ -385,6 +418,7 @@ Environment:
   AXON_QWEN_MODEL_ID   Local Qwen model id
   AXON_OPENROUTER_MODEL OpenRouter model id
   OPENROUTER_API_KEY   Required for cloud-openrouter profile
+  AXON_SKIP_PERMISSIONS Set to 1 to auto-approve headless run permissions
 HELP
     ;;
   *)

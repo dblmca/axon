@@ -60,7 +60,7 @@
 
     // "ask" instead of "deny" — deny hides tools from the model entirely,
     // preventing MCP tool discovery. "ask" shows them but requires approval
-    // (auto-approved with --dangerously-skip-permissions).
+    // (auto-approved only when headless runs opt in with --yes or AXON_SKIP_PERMISSIONS=1).
     "engram_*": "ask",
     "engram_status": "allow",
     "engram_search": "allow",

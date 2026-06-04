@@ -226,8 +226,8 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
       })
     }
 
-    // reasoning content (Copilot uses reasoning_text):
-    const reasoning = choice.message.reasoning_text
+    // reasoning content: Copilot (reasoning_text), Kimi K2.6 (reasoning)
+    const reasoning = choice.message.reasoning_text ?? choice.message.reasoning
     if (reasoning != null && reasoning.length > 0) {
       content.push({
         type: "reasoning",
@@ -477,8 +477,9 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
               reasoningOpaque = delta.reasoning_opaque
             }
 
-            // enqueue reasoning before text deltas (Copilot uses reasoning_text):
-            const reasoningContent = delta.reasoning_text
+            // enqueue reasoning before text deltas
+            // Copilot: reasoning_text, DeepSeek: reasoning_content, Kimi K2.6: reasoning
+            const reasoningContent = delta.reasoning_text ?? delta.reasoning
             if (reasoningContent) {
               if (!isActiveReasoning) {
                 controller.enqueue({
@@ -754,8 +755,9 @@ const OpenAICompatibleChatResponseSchema = z.object({
       message: z.object({
         role: z.literal("assistant").nullish(),
         content: z.string().nullish(),
-        // Copilot-specific reasoning fields
+        // Reasoning fields: Copilot (reasoning_text), Kimi K2.6 (reasoning)
         reasoning_text: z.string().nullish(),
+        reasoning: z.string().nullish(),
         reasoning_opaque: z.string().nullish(),
         tool_calls: z
           .array(
@@ -789,8 +791,9 @@ const createOpenAICompatibleChatChunkSchema = <ERROR_SCHEMA extends z.core.$ZodT
             .object({
               role: z.enum(["assistant"]).nullish(),
               content: z.string().nullish(),
-              // Copilot-specific reasoning fields
+              // Reasoning fields: Copilot (reasoning_text), Kimi K2.6 (reasoning)
               reasoning_text: z.string().nullish(),
+              reasoning: z.string().nullish(),
               reasoning_opaque: z.string().nullish(),
               tool_calls: z
                 .array(

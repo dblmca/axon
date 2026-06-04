@@ -14,7 +14,7 @@
       "options": {
         "baseURL": "https://api.deepseek.com",
         "apiKey": "{env:DEEPSEEK_API_KEY}",
-        "timeout": 120000
+        "timeout": 300000
       },
       "models": {
         "deepseek-v4-pro": {
@@ -91,7 +91,9 @@
     "engram_dashboard": "allow",
     "engram_notify": "allow",
     "engram_forget": "allow",
-    "engram_instincts": "allow"
+    "engram_instincts": "allow",
+
+    "jcodemunch_*": "allow"
   },
 
   "mcp": {
@@ -109,6 +111,12 @@
     "agentic-mcp": {
       "type": "local",
       "command": ["node", "{env:AXON_AGENTIC_MCP_SERVER}"],
+      "enabled": true,
+      "timeout": 10000
+    },
+    "jcodemunch": {
+      "type": "local",
+      "command": ["/home/mmca/envs/jcodemunch/bin/jcodemunch-mcp", "serve"],
       "enabled": true,
       "timeout": 10000
     }

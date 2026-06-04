@@ -25,6 +25,9 @@ axon
 # Headless single-prompt mode
 axon run "list the current directory"
 
+# Automation mode with permission auto-approval
+axon run --yes "run the smoke check"
+
 # Smoke test + interop test
 axon smoke
 axon test
@@ -104,6 +107,7 @@ Profiles live in `profiles/` as `.jsonc` files. The launcher injects the active 
 | `AXON_QWEN_MODEL_ID` | `Qwen3.6-35B-A3B-abliterated-Q4_K_M.gguf` |
 | `AXON_OPENROUTER_MODEL` | `deepseek/deepseek-v4-pro` |
 | `AXON_WORKTREE_ROOT` | `/tmp/axon-worktrees` |
+| `AXON_SKIP_PERMISSIONS` | `1` enables headless permission auto-approval |
 | `AXON_AGENT_ROLE` / `ENGRAM_AGENT_ROLE` | `implementation_worker` |
 | `AXON_MODEL_CLASS` / `ENGRAM_MODEL_CLASS` | inferred from active model |
 | `AXON_MODEL_TIER` / `ENGRAM_MODEL_TIER` | inferred from active model |

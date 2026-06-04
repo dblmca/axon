@@ -45,9 +45,9 @@ Status: implemented in `start-axon-fleet.sh`; accepts positional count or `--cou
 ## R2: Auto-Approve for Fleet Agents
 
 ### R2.1: CLI one-shot mode
-- `opencode run` with `--dangerously-skip-permissions` auto-approves all permissions
+- `axon run --yes` passes OpenCode's permission auto-approval flag for explicit automation
 - Already implemented in vendored OpenCode — **no code changes needed**
-- Document this as the recommended fleet approach
+- Document this as the recommended fleet-only approach; plain `axon run` should keep the normal permission gate
 
 ### R2.2: Headless serve mode
 - `opencode serve` needs equivalent of `--dangerously-skip-permissions`
@@ -172,7 +172,8 @@ Status: tool classification covered by `tests/test-plugin-unit.mjs`; full observ
 #### T1.5: CLI one-shot mode
 - Test: `opencode run "prompt"` completes and exits
 - Test: `--format json` outputs valid JSON events
-- Test: `--dangerously-skip-permissions` auto-approves
+- Test: plain `axon run` does not auto-approve
+- Test: `axon run --yes` auto-approves
 - Test: `--session` continues existing session
 
 #### T1.6: Fleet launcher

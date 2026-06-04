@@ -69,7 +69,7 @@ Current follow-up items:
 
 ## Overview
 
-`bin/axon` already has `--profile`, `run --dangerously-skip-permissions`, JSON output, and profile validation. The fleet launcher scripts don't use it yet. This plan rewires the fleet scripts to use `bin/axon`, adds missing pieces (model override, SIGTERM handler, worktree isolation), and writes tests for both existing and new functionality.
+`bin/axon` already has `--profile`, `run --yes` for explicit headless auto-approval, JSON output, and profile validation. The fleet launcher scripts don't use it yet. This plan rewires the fleet scripts to use `bin/axon`, adds missing pieces (model override, SIGTERM handler, worktree isolation), and writes tests for both existing and new functionality.
 
 Key insight: `opencode run` is the proven fleet primitive (successful in tests #56 and #60). `opencode serve` is a future optimization, not needed now.
 
