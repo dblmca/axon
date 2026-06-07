@@ -2,7 +2,7 @@
 
 A networked coding-agent harness built on [OpenCode](https://github.com/anomalyco/opencode), designed to peer with Claude Code and Codex on a shared [Engram](https://github.com/dblmca/engram) memory and coordination plane.
 
-Model-agnostic by design. The first deployment target is a local Qwen3.6-35B, but provider and model selection come from runtime profiles, not hardwired code.
+Model-agnostic by design. The default deployment target is DeepSeek V4 Pro, but provider and model selection come from runtime profiles, not hardwired code.
 
 ## What It Does
 
@@ -33,6 +33,7 @@ axon smoke
 axon test
 
 # Use a different profile
+axon --profile vector-qwen-engram
 axon --profile cloud-openrouter
 axon --profile minimal-offline
 
@@ -46,7 +47,7 @@ axon fleet 3 --profile cloud-openrouter --model deepseek/deepseek-v4-pro --proje
 axon --task 42 --worktree run "complete task 42"
 ```
 
-Requires `bun` and a running Engram server (except `minimal-offline` profile).
+Requires `bun`, `DEEPSEEK_API_KEY` for the default profile, and a running Engram server (except `minimal-offline` profile).
 
 ## Architecture
 
@@ -78,7 +79,8 @@ Full architecture doc: [docs/architecture.md](docs/architecture.md)
 |------|------|
 | `bin/axon` | CLI entry point — profile selection, subcommands, auto-config |
 | `opencode/.opencode/plugin/axon-engram.js` | Core plugin — session init, capture, context injection |
-| `profiles/axon.vector-qwen-engram.jsonc` | Deployment profile — provider, tools, permissions, MCP config |
+| `profiles/axon.cloud-deepseek.jsonc` | Default deployment profile — DeepSeek V4 Pro with Engram/MCP config |
+| `profiles/axon.vector-qwen-engram.jsonc` | Local Qwen deployment profile — provider, tools, permissions, MCP config |
 | `scripts/run-vector-qwen.sh` | Launcher — injects profile via `OPENCODE_CONFIG_CONTENT` |
 | `scripts/smoke-vector-qwen.sh` | Smoke test — validates full stack end-to-end |
 | `scripts/test-interop.sh` | Interop test suite — 10 tests across Engram coordination plane |
@@ -95,9 +97,10 @@ Profiles live in `profiles/` as `.jsonc` files. The launcher injects the active 
 
 | Profile | Provider | Engram | Use Case |
 |---------|----------|--------|----------|
-| `axon.vector-qwen-engram` | Local Qwen3.6-35B | Local | Default — full local stack |
+| `axon.cloud-deepseek` | DeepSeek V4 Pro | Local | Default — cloud model with local Engram |
+| `axon.vector-qwen-engram` | Local Qwen3.6-35B | Local | Full local stack |
 | `axon.remote-engram` | Local Qwen3.6-35B | Remote host | Axon on a different machine than Engram |
-| `axon.cloud-openrouter` | OpenRouter (DeepSeek V3) | Local | When local GPU is busy |
+| `axon.cloud-openrouter` | OpenRouter (DeepSeek V4 Pro) | Local | OpenRouter fallback |
 | `axon.minimal-offline` | Local Qwen3.6-35B | None | Offline coding, no network dependencies |
 
 | Variable | Default |
@@ -106,8 +109,10 @@ Profiles live in `profiles/` as `.jsonc` files. The launcher injects the active 
 | `AXON_QWEN_BASE_URL` | `http://192.168.1.153:8081/v1` |
 | `AXON_QWEN_MODEL_ID` | `Qwen3.6-35B-A3B-abliterated-Q4_K_M.gguf` |
 | `AXON_OPENROUTER_MODEL` | `deepseek/deepseek-v4-pro` |
+| `AXON_DEEPSEEK_MODEL` | `deepseek-v4-pro` |
 | `AXON_WORKTREE_ROOT` | `/tmp/axon-worktrees` |
 | `AXON_SKIP_PERMISSIONS` | `1` enables headless permission auto-approval |
+| `AXON_NO_ENGRAM` | `1` disables Engram session init/complete in the launcher (MCP must also be disabled in profile) |
 | `AXON_AGENT_ROLE` / `ENGRAM_AGENT_ROLE` | `implementation_worker` |
 | `AXON_MODEL_CLASS` / `ENGRAM_MODEL_CLASS` | inferred from active model |
 | `AXON_MODEL_TIER` / `ENGRAM_MODEL_TIER` | inferred from active model |
@@ -117,7 +122,17 @@ Profiles live in `profiles/` as `.jsonc` files. The launcher injects the active 
 | `AXON_AGENT_LIMITS` / `ENGRAM_AGENT_LIMITS` | JSON limits object/array |
 | `AXON_RELEASE_AGENT_EXEMPT` / `ENGRAM_RELEASE_AGENT_EXEMPT` | `true` for out-of-pool release agents |
 | `ENGRAM_WORKER_URL` | `http://localhost:37779` |
+| `DEEPSEEK_API_KEY` | *(required for default cloud-deepseek profile)* |
 | `OPENROUTER_API_KEY` | *(required for cloud profile)* |
+
+## Engram Connection
+
+Engram is disabled in the `cloud-deepseek` profile as of 2026-06-07. Axon runs in tool-only mode — vergence-p MCP + jcodemunch, no shared memory or agent coordination. To re-enable:
+
+1. Set `"enabled": true` on `engram` and `agentic-mcp` in `profiles/axon.cloud-deepseek.jsonc`
+2. Remove `AXON_NO_ENGRAM` from env (if set)
+
+Reason: during pentest testing, Engram adds latency and cross-talk without benefit to single-agent headless runs. Re-enable when fleet coordination or memory persistence is needed.
 
 ## Upstream
 

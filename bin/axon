@@ -2,7 +2,13 @@
 set -euo pipefail
 
 VERSION="0.1.0"
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE" ]]; do
+  SOURCE_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$SOURCE_DIR/$SOURCE"
+done
+ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
 SCRIPTS="$ROOT/scripts"
 
 # --- Load env file (API keys, like ~/.codex/api_key.env) ---
@@ -14,7 +20,7 @@ if [[ -f "$AXON_ENV" ]]; then
 fi
 
 # --- Profile selection ---
-PROFILE_NAME="${AXON_PROFILE:-vector-qwen-engram}"
+PROFILE_NAME="${AXON_PROFILE:-cloud-deepseek}"
 PROFILE_SPECIFIED=false
 MODEL_OVERRIDE=""
 PROJECT_OVERRIDE=""
@@ -193,7 +199,7 @@ first_run() {
   echo ""
   echo "  Axon wraps OpenCode with Engram memory, multi-agent coordination,"
   echo "  and persistent sessions. It runs local LLMs (Qwen on Vector) or"
-  echo "  cloud providers (OpenRouter)."
+  echo "  cloud providers (DeepSeek or OpenRouter)."
   echo ""
   echo "  Quick start:"
   echo "    axon              Interactive TUI session"
@@ -247,6 +253,10 @@ launch() {
     echo "ENGRAM_API_KEY is required for profile '$PROFILE_NAME'." >&2
     exit 1
   fi
+  if [[ "$PROFILE_NAME" == "cloud-deepseek" && -z "${DEEPSEEK_API_KEY:-}" ]]; then
+    echo "DEEPSEEK_API_KEY is required for profile '$PROFILE_NAME'." >&2
+    exit 1
+  fi
 
   cd "$ROOT/opencode"
   bun run dev "$@"
@@ -292,7 +302,13 @@ case "$CMD" in
   ""|tui)
     first_run
     banner
-    launch "$@"
+    tui_args=("$@")
+    if [[ $# -eq 0 || "${1:-}" == -* ]]; then
+      tui_args=("$AXON_PROJECT_DIR" "$@")
+    elif [[ "${tui_args[0]}" != /* ]]; then
+      tui_args[0]="$AXON_PROJECT_DIR/${tui_args[0]}"
+    fi
+    launch "${tui_args[@]}"
     ;;
   run)
     while [[ $# -gt 0 ]]; do
@@ -330,7 +346,7 @@ case "$CMD" in
       ln -sfn "$AXON_PLUGIN_SRC" "$AXON_PLUGIN_DST"
       AXON_PLUGIN_CLEANUP="$AXON_PLUGIN_DST"
     fi
-    if [[ -n "${ENGRAM_API_KEY:-}" && -n "${ENGRAM_WORKER_URL:-}" ]]; then
+    if [[ -z "${AXON_NO_ENGRAM:-}" && -n "${ENGRAM_API_KEY:-}" && -n "${ENGRAM_WORKER_URL:-}" ]]; then
       curl -sf "${ENGRAM_WORKER_URL}/api/sessions/init" \
         -H "x-api-key: ${ENGRAM_API_KEY}" -H "Content-Type: application/json" \
         -d "{\"sdk_session_id\":\"${AXON_SESSION_ID}\",\"project\":\"${AXON_PROJECT}\",\"source_ai\":\"axon\",\"client_hostname\":\"$(hostname)\"}" \
@@ -344,7 +360,7 @@ case "$CMD" in
     RUN_EXIT=$?
     # Cleanup symlink + complete engram session
     [[ -n "$AXON_PLUGIN_CLEANUP" ]] && rm -f "$AXON_PLUGIN_CLEANUP"
-    if [[ -n "${ENGRAM_API_KEY:-}" && -n "${ENGRAM_WORKER_URL:-}" ]]; then
+    if [[ -z "${AXON_NO_ENGRAM:-}" && -n "${ENGRAM_API_KEY:-}" && -n "${ENGRAM_WORKER_URL:-}" ]]; then
       curl -sf "${ENGRAM_WORKER_URL}/api/sessions/${AXON_SESSION_ID}/complete" \
         -X POST -H "x-api-key: ${ENGRAM_API_KEY}" -H "Content-Type: application/json" \
         -d '{}' >/dev/null 2>&1 || true
@@ -402,7 +418,7 @@ Commands:
   help           Show this help
 
 Options:
-  --profile NAME    Select deployment profile (default: vector-qwen-engram)
+  --profile NAME    Select deployment profile (default: cloud-deepseek)
                     Available: vector-qwen-engram, remote-engram, cloud-openrouter, cloud-deepseek, minimal-offline
   --model SLUG      Override the selected profile model
   --project NAME    Override Engram project registration
@@ -417,6 +433,8 @@ Environment:
   AXON_QWEN_BASE_URL   Qwen endpoint (default: http://192.168.1.153:8081/v1)
   AXON_QWEN_MODEL_ID   Local Qwen model id
   AXON_OPENROUTER_MODEL OpenRouter model id
+  AXON_DEEPSEEK_MODEL  DeepSeek model id (default: deepseek-v4-pro)
+  DEEPSEEK_API_KEY     Required for cloud-deepseek profile
   OPENROUTER_API_KEY   Required for cloud-openrouter profile
   AXON_SKIP_PERMISSIONS Set to 1 to auto-approve headless run permissions
 HELP

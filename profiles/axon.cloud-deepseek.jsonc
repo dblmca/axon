@@ -93,7 +93,9 @@
     "engram_forget": "allow",
     "engram_instincts": "allow",
 
-    "jcodemunch_*": "allow"
+    "jcodemunch_*": "allow",
+
+    "vergence-p_*": "allow"
   },
 
   "mcp": {
@@ -105,13 +107,13 @@
         "ENGRAM_WORKER_URL": "{env:ENGRAM_WORKER_URL}",
         "ENGRAM_AGENT_RUNTIME": "axon"
       },
-      "enabled": true,
+      "enabled": false,
       "timeout": 10000
     },
     "agentic-mcp": {
       "type": "local",
       "command": ["node", "{env:AXON_AGENTIC_MCP_SERVER}"],
-      "enabled": true,
+      "enabled": false,
       "timeout": 10000
     },
     "jcodemunch": {
@@ -119,6 +121,17 @@
       "command": ["/home/mmca/envs/jcodemunch/bin/jcodemunch-mcp", "serve"],
       "enabled": true,
       "timeout": 10000
+    },
+    "vergence-p": {
+      "type": "remote",
+      "url": "https://vergence.emergent.tools/mcp/",
+      "headers": {
+        "Authorization": "Bearer {env:VERGENCE_MCP_TOKEN}",
+        "CF-Access-Client-Id": "97c23d8aebbdc3311d24f7c8d73091f3.access",
+        "CF-Access-Client-Secret": "7e6073249b3eb7d10cf6cd89cce04a265427bca28c51a714cc57b29413b1db25"
+      },
+      "enabled": true,
+      "timeout": 600000
     }
   }
 }
