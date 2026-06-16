@@ -3,6 +3,8 @@ import { SOURCE_AI, hostname, projectName, agentName, tmuxSession, capabilities,
 
 const SERVICE = "axon-engram"
 const DRAIN_TIMEOUT_MS = 5_000
+const SESSION_TTL_MS = 3_600_000
+const MAX_INFLIGHT = 20
 
 export const sessionState = new Map()
 export const inflight = new Set()
@@ -11,7 +13,8 @@ let shutdownHandlersInstalled = false
 
 export function state(sessionID) {
   const hit = sessionState.get(sessionID)
-  if (hit) return hit
+  if (hit) { hit._lastAccess = Date.now(); return hit }
+  evictStaleSessions()
   const next = {
     agentName: "",
     initialized: false,
@@ -23,9 +26,17 @@ export function state(sessionID) {
     contextExpiresAt: 0,
     toolsUsed: new Set(),
     filesModified: new Set(),
+    _lastAccess: Date.now(),
   }
   sessionState.set(sessionID, next)
   return next
+}
+
+function evictStaleSessions() {
+  const now = Date.now()
+  for (const [id, s] of sessionState) {
+    if (now - (s._lastAccess || 0) > SESSION_TTL_MS) sessionState.delete(id)
+  }
 }
 
 export function noteModel(sessionID, model) {
@@ -40,13 +51,6 @@ export function noteModel(sessionID, model) {
 
 export function resolveSessionID(sessionID) {
   return process.env.AXON_SESSION_ID || sessionID
-}
-
-export function daysOld(dateValue) {
-  if (!dateValue) return Infinity
-  const ts = typeof dateValue === "number" ? dateValue : Date.parse(dateValue)
-  if (!Number.isFinite(ts)) return Infinity
-  return (Date.now() - ts) / 86_400_000
 }
 
 export function taskDescription(sessionID) {
@@ -65,6 +69,7 @@ export function log(input, level, message, extra = {}) {
 
 export function background(input, promise, message, extra = {}) {
   if (shuttingDown) return
+  if (inflight.size >= MAX_INFLIGHT) return
   const tracked = promise.catch((error) =>
     log(input, "WARN", message, { ...extra, error: errorMessage(error) }),
   )

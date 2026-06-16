@@ -36,7 +36,6 @@ import {
   noteModel,
   resolveSessionID,
   taskDescription,
-  daysOld,
 } from "./lifecycle.js"
 
 // capture.js
@@ -233,15 +232,6 @@ describe("lifecycle: resolveSessionID", () => {
   it("returns original if no env override", () => {
     delete process.env.AXON_SESSION_ID
     expect(resolveSessionID("original")).toBe("original")
-  })
-})
-
-describe("lifecycle: daysOld", () => {
-  it("returns Infinity for null", () => expect(daysOld(null)).toBe(Infinity))
-  it("returns ~0 for now", () => expect(daysOld(Date.now())).toBeLessThan(0.001))
-  it("returns ~1 for yesterday", () => {
-    const yesterday = Date.now() - 86_400_000
-    expect(daysOld(yesterday)).toBeCloseTo(1, 1)
   })
 })
 
