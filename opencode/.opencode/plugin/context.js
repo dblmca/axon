@@ -66,7 +66,8 @@ export async function contextBlock(input, runtime, sessionID) {
         budget_tokens: 2000,
       },
     }).catch(() => ({ ok: false, status: 0 })),
-    request(runtime, `/api/agents/messages/inbox?name=${encodeURIComponent(agent)}&unread_only=true&limit=5`),
+    request(runtime, `/api/agents/messages/inbox?name=${encodeURIComponent(agent)}&unread_only=true&limit=5`)
+      .catch(() => ({ ok: false, status: 0 })),
     request(
       runtime,
       `/api/tasks?project=${encodeURIComponent(project)}&assigned_to=${encodeURIComponent(agent)}`,

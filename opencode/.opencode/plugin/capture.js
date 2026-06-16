@@ -117,7 +117,7 @@ export function onToolExecute(input, runtime, rawSessionID, tool, args, output) 
   )
 }
 
-export function onTextComplete(input, runtime, rawSessionID, model, messageID, partID, text, activeModelFn, modelLabelFn) {
+export function onTextComplete(input, runtime, rawSessionID, _model, messageID, partID, text, activeModelFn, modelLabelFn) {
   const sessionID = resolveSessionID(rawSessionID)
   const current = state(sessionID)
   const llm = activeModelFn(runtime, current)

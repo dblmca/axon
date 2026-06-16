@@ -68,11 +68,10 @@ export function log(input, level, message, extra = {}) {
 }
 
 export function background(input, promise, message, extra = {}) {
-  if (shuttingDown) return
-  if (inflight.size >= MAX_INFLIGHT) return
   const tracked = promise.catch((error) =>
     log(input, "WARN", message, { ...extra, error: errorMessage(error) }),
   )
+  if (shuttingDown || inflight.size >= MAX_INFLIGHT) return
   inflight.add(tracked)
   tracked.finally(() => inflight.delete(tracked))
 }
@@ -135,7 +134,7 @@ export async function ensureSession(input, runtime, sessionID) {
         client_hostname: hostname(),
       },
     })
-    await syncAgent(input, runtime, sessionID)
+    await syncAgent(input, runtime, effectiveID)
     current.initialized = init.ok
     current.initializing = undefined
     if (init.ok) return current
