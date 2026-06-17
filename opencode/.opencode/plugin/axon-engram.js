@@ -1,4 +1,4 @@
-import { asRecord, request, errorMessage, cleanText, json } from "./util.js"
+import { asRecord, request, errorMessage, cleanText, json } from "./lib/util.js"
 import {
   SOURCE_AI,
   hostname,
@@ -8,7 +8,7 @@ import {
   activeModel,
   modelLabel,
   capabilities,
-} from "./identity.js"
+} from "./lib/identity.js"
 import {
   sessionState,
   inflight,
@@ -22,7 +22,7 @@ import {
   ensureSession,
   finalizeSession,
   installShutdownHandlers,
-} from "./lifecycle.js"
+} from "./lib/lifecycle.js"
 import {
   promptText,
   toolType,
@@ -30,8 +30,8 @@ import {
   postVerify,
   onToolExecute,
   onTextComplete,
-} from "./capture.js"
-import { loadInstructions, contextBlock } from "./context.js"
+} from "./lib/capture.js"
+import { loadInstructions, contextBlock } from "./lib/context.js"
 
 const DEFAULT_WORKER_URL = "http://localhost:37779"
 const DEFAULT_CONTEXT_TTL_MS = 30_000

@@ -13,7 +13,7 @@ import {
   errorMessage,
   cleanText,
   json,
-} from "./util.js"
+} from "./lib/util.js"
 
 // identity.js
 import {
@@ -28,7 +28,7 @@ import {
   agentProfile,
   projectName,
   mcpNames,
-} from "./identity.js"
+} from "./lib/identity.js"
 
 // lifecycle.js
 import {
@@ -36,7 +36,7 @@ import {
   noteModel,
   resolveSessionID,
   taskDescription,
-} from "./lifecycle.js"
+} from "./lib/lifecycle.js"
 
 // capture.js
 import {
@@ -44,10 +44,10 @@ import {
   toolType,
   toolTitle,
   sessionIDFromEvent,
-} from "./capture.js"
+} from "./lib/capture.js"
 
 // context.js
-import { budgetAppend, loadInstructions } from "./context.js"
+import { budgetAppend, loadInstructions } from "./lib/context.js"
 
 // --- util tests ---
 describe("util: asRecord", () => {
