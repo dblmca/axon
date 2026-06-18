@@ -20,7 +20,7 @@ if [[ -f "$AXON_ENV" ]]; then
 fi
 
 # --- Profile selection ---
-PROFILE_NAME="${AXON_PROFILE:-cloud-deepseek}"
+PROFILE_NAME="${AXON_PROFILE:-cloud-glm}"
 PROFILE_SPECIFIED=false
 MODEL_OVERRIDE=""
 PROJECT_OVERRIDE=""
