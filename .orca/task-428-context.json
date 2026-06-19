@@ -1,0 +1,49 @@
+{
+  "graph": {
+    "id": "orca-axon-d915e949",
+    "title": null,
+    "status": null
+  },
+  "task": {
+    "id": 428,
+    "title": "FG-03: Phase-3 cross-agent interop test design and initial implementation",
+    "objective": "The project frontier (architecture.md Phase 3). RS-1 and RS-2 are done. (a) Write an interop test-scenario design doc. (b) Implement the simplest test — shared task-graph create/claim via the Engram API, NO live agents. Covers Claude<->Axon<->Codex shared graphs, channels, file locks. You MUST make the code changes and commit them.",
+    "status": "pending",
+    "priority": "normal"
+  },
+  "dependency_state": {
+    "after": [],
+    "blocked_by": []
+  },
+  "file_ownership_hints": [],
+  "acceptance_checks": [
+    "interop test design doc written",
+    "at least one API-level interop test passes",
+    "test covers shared task-graph create/claim",
+    "changes committed"
+  ],
+  "claim_policy": {
+    "task_id": 428,
+    "graph_id": "orca-axon-d915e949",
+    "assignment_policy": "open_lowest_capable",
+    "required_capabilities": [],
+    "preferred_capabilities": [],
+    "required_role": null,
+    "required_model_class": null,
+    "min_model_tier": 0,
+    "max_cost_tier": 99,
+    "risk_level": "low",
+    "worktree_branch": null,
+    "file_ownership_hints": [],
+    "acceptance_checks": [
+      "interop test design doc written",
+      "at least one API-level interop test passes",
+      "test covers shared task-graph create/claim",
+      "changes committed"
+    ],
+    "payload": {},
+    "created_at_epoch": "1781877075835",
+    "updated_at_epoch": "1781877075835"
+  },
+  "file_views": []
+}
