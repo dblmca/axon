@@ -37,6 +37,9 @@ assert.equal(runtime.enabled, true)
 assert.equal(runtime.apiKey, "test-key")
 assert.deepEqual(runtime.mcpNames, ["engram"])
 
+const savedEngramProject = process.env.ENGRAM_PROJECT
+delete process.env.ENGRAM_PROJECT
+
 const input = {
   project: { name: "axon" },
   worktree: path.resolve("."),
@@ -45,6 +48,8 @@ const input = {
 }
 
 assert.equal(projectName(input), "axon")
+
+process.env.ENGRAM_PROJECT = savedEngramProject
 assert.equal(toolType("engram_search", {}), "skip")
 assert.equal(toolType("bash", { command: "ls" }), "command")
 assert.equal(toolType("apply_patch", { file_path: "bin/axon" }), "code_edit")
