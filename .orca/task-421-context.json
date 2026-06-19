@@ -1,0 +1,47 @@
+{
+  "graph": {
+    "id": "orca-axon-e1148c13",
+    "title": null,
+    "status": null
+  },
+  "task": {
+    "id": 421,
+    "title": "RS-1: Fix broken test imports in plugin test suite",
+    "objective": "The plugin unit-test suite crashes on import (Cannot find module ./lib/util.js). Fix the 5 broken imports in opencode/.opencode/plugin/lib/axon-engram.test.js (./lib/X.js -> ./X.js), or move the test file to opencode/.opencode/plugin/. Verify with bun test. You MUST make the code changes and commit them.",
+    "status": "pending",
+    "priority": "normal"
+  },
+  "dependency_state": {
+    "after": [],
+    "blocked_by": []
+  },
+  "file_ownership_hints": [],
+  "acceptance_checks": [
+    "bun test passes with 0 errors",
+    "all plugin test imports resolve correctly",
+    "changes committed to branch"
+  ],
+  "claim_policy": {
+    "task_id": 421,
+    "graph_id": "orca-axon-e1148c13",
+    "assignment_policy": "open_lowest_capable",
+    "required_capabilities": [],
+    "preferred_capabilities": [],
+    "required_role": null,
+    "required_model_class": null,
+    "min_model_tier": 0,
+    "max_cost_tier": 99,
+    "risk_level": "low",
+    "worktree_branch": null,
+    "file_ownership_hints": [],
+    "acceptance_checks": [
+      "bun test passes with 0 errors",
+      "all plugin test imports resolve correctly",
+      "changes committed to branch"
+    ],
+    "payload": {},
+    "created_at_epoch": "1781873181334",
+    "updated_at_epoch": "1781873181334"
+  },
+  "file_views": []
+}
