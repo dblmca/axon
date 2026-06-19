@@ -148,8 +148,10 @@ model_short() {
   local m
   if [[ "$PROFILE_NAME" == "cloud-openrouter" ]]; then
     m="${AXON_OPENROUTER_MODEL:-unset}"
-  elif [[ "$PROFILE_NAME" == "cloud-deepseek" ]]; then
+  elif [[ "$PROFILE_NAME" == "cloud-deepseek" || "$PROFILE_NAME" == "remote-deepseek" ]]; then
     m="${AXON_DEEPSEEK_MODEL:-unset}"
+  elif [[ "$PROFILE_NAME" == "cloud-glm" || "$PROFILE_NAME" == "remote-glm" ]]; then
+    m="glm-5.2"
   else
     m="${AXON_QWEN_MODEL_ID%.gguf}"
   fi
@@ -418,8 +420,9 @@ Commands:
   help           Show this help
 
 Options:
-  --profile NAME    Select deployment profile (default: cloud-deepseek)
-                    Available: vector-qwen-engram, remote-engram, cloud-openrouter, cloud-deepseek, minimal-offline
+  --profile NAME    Select deployment profile (default: cloud-glm)
+                    Local:  cloud-glm, cloud-deepseek, cloud-openrouter, vector-qwen-engram, minimal-offline
+                    Remote: remote-glm, remote-deepseek
   --model SLUG      Override the selected profile model
   --project NAME    Override Engram project registration
   --task ID         Set task id for a run
