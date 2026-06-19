@@ -137,8 +137,9 @@ export default {
       },
 
       "experimental.text.complete": async ({ sessionID: rawSessionID, messageID, partID }, output) => {
+        output.text = String(output.text || "").replace(/<think>[\s\S]*?<\/think>\s*/g, "").trim()
         if (!runtime.enabled || !runtime.apiKey || !runtime.captureResponses) return
-        const text = String(output.text || "").trim()
+        const text = output.text
         if (!text) return
         onTextComplete(input, runtime, rawSessionID, null, messageID, partID, text, activeModel, modelLabel)
       },

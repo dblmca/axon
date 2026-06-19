@@ -114,6 +114,43 @@ function isMcpConfigured(entry: McpEntry): entry is ConfigMCP.Info {
 
 const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_-]/g, "_")
 
+const MAX_ARG_STRING_LENGTH = 50_000
+const MAX_ARG_TOTAL_BYTES = 200_000
+
+function sanitizeToolArgs(toolName: string, args: Record<string, unknown>): Record<string, unknown> {
+  let serialized: string
+  try {
+    serialized = JSON.stringify(args)
+  } catch {
+    log.warn("tool call args failed to serialize", { tool: toolName })
+    return { _error: "Tool call arguments could not be serialized. This is likely a model generation error." }
+  }
+  if (serialized.length > MAX_ARG_TOTAL_BYTES) {
+    log.warn("tool call args exceed total size limit, truncating", {
+      tool: toolName,
+      totalBytes: serialized.length,
+      limit: MAX_ARG_TOTAL_BYTES,
+    })
+    return { _error: `Tool call arguments too large (${serialized.length} bytes). This is likely a model generation error.` }
+  }
+
+  const result: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(args)) {
+    if (typeof value === "string" && value.length > MAX_ARG_STRING_LENGTH) {
+      log.warn("tool call arg string too long, truncating", {
+        tool: toolName,
+        arg: key,
+        length: value.length,
+        limit: MAX_ARG_STRING_LENGTH,
+      })
+      result[key] = value.slice(0, MAX_ARG_STRING_LENGTH) + `... [truncated from ${value.length} chars]`
+    } else {
+      result[key] = value
+    }
+  }
+  return result
+}
+
 // Convert MCP tool definition to AI SDK Tool type
 function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number): Tool {
   const inputSchema = mcpTool.inputSchema
@@ -130,10 +167,11 @@ function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number
     description: mcpTool.description ?? "",
     inputSchema: jsonSchema(schema),
     execute: async (args: unknown) => {
+      const safeArgs = sanitizeToolArgs(mcpTool.name, (args || {}) as Record<string, unknown>)
       return client.callTool(
         {
           name: mcpTool.name,
-          arguments: (args || {}) as Record<string, unknown>,
+          arguments: safeArgs,
         },
         CallToolResultSchema,
         {

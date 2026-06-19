@@ -419,6 +419,11 @@ export const layer: Layer.Layer<
           case "text-delta":
             if (!ctx.currentText) return
             ctx.currentText.text += value.text
+            if (/<tool_call>|<arg_key>/.test(ctx.currentText.text.slice(-30) + value.text)) {
+              log.warn("model emitted XML-style tool call in text stream (tool call will not execute)", {
+                sessionID: ctx.sessionID,
+              })
+            }
             if (value.providerMetadata) ctx.currentText.metadata = value.providerMetadata
             yield* session.updatePartDelta({
               sessionID: ctx.currentText.sessionID,
