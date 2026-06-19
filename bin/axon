@@ -232,13 +232,7 @@ launch() {
     echo "profile: ${PROFILE_NAME}"
     echo "project_dir: ${AXON_PROJECT_DIR}"
     [[ -n "${ENGRAM_PROJECT:-}" ]] && echo "project: ${ENGRAM_PROJECT}"
-    if [[ "$PROFILE_NAME" == "cloud-openrouter" ]]; then
-      echo "model: ${AXON_OPENROUTER_MODEL:-}"
-    elif [[ "$PROFILE_NAME" == "cloud-deepseek" ]]; then
-      echo "model: ${AXON_DEEPSEEK_MODEL:-}"
-    else
-      echo "model: ${AXON_QWEN_MODEL_ID}"
-    fi
+    echo "model: $(model_short)"
     printf 'command: bun run dev'
     printf ' %q' "$@"
     printf '\n'
