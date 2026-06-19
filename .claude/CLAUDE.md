@@ -11,7 +11,7 @@ Model-agnostic by design — provider and model selection come from runtime prof
 scripts/smoke-vector-qwen.sh
 
 # Launch interactive session (requires ENGRAM_API_KEY)
-ENGRAM_API_KEY=... scripts/run-vector-qwen.sh
+ENGRAM_API_KEY=... bin/axon --profile vector-qwen-engram
 
 # Launch through the Axon wrapper with profile/model/project selection
 bin/axon --profile cloud-openrouter --model deepseek/deepseek-v4-pro --project axon
@@ -49,7 +49,7 @@ Three integration layers connect Axon to Engram:
 |------|---------|
 | `opencode/.opencode/plugin/axon-engram.js` | Core Axon plugin — session lifecycle, capture, context injection, env propagation |
 | `profiles/axon.vector-qwen-engram.jsonc` | Deployment profile — provider config, tool surface, MCP servers, permissions |
-| `scripts/run-vector-qwen.sh` | Launcher — sets env vars, injects profile via `OPENCODE_CONFIG_CONTENT`, runs `bun run dev` |
+| `bin/axon` | Unified launcher — profile/model/project selection, subcommands, auto-config |
 | `scripts/smoke-vector-qwen.sh` | Smoke test — validates Qwen health, chat completion, Engram worker, MCP servers, full Axon round-trip |
 | `docs/architecture.md` | Architecture plan, boundary rules, phase plan |
 | `docs/runtime-bootstrap.md` | Deployment walkthrough, env var reference |
@@ -76,7 +76,7 @@ The first deployment profile targets the local Vector server running Qwen3.6-35B
 
 ### Profile Override Pattern
 
-Profiles live in `profiles/` as `.jsonc` files. The launcher injects the active profile via `OPENCODE_CONFIG_CONTENT` so the repo-level OpenCode config stays neutral. To add a new deployment target, create a new profile and a corresponding launcher script.
+Profiles live in `profiles/` as `.jsonc` files. The unified `bin/axon` launcher injects the active profile via `OPENCODE_CONFIG_CONTENT` so the repo-level OpenCode config stays neutral. To add a new deployment target, create a new profile JSONC file and select it with `--profile`.
 
 ## Subagents and Parallel Work
 

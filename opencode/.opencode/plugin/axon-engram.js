@@ -84,7 +84,7 @@ export default {
         background(
           input,
           (async () => {
-            await postVerify(input, runtime, deleted).catch(() => {})
+            await postVerify(input, runtime, deleted).catch((_err) => { console.debug("axon-engram postVerify failed", String(_err)) })
             await finalizeSession(input, runtime, deleted)
           })(),
           "failed to finalize Engram session",

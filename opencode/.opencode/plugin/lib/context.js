@@ -21,7 +21,9 @@ export function loadInstructions(worktree) {
         cachedInstructions.set(key, wrapped)
         return wrapped
       }
-    } catch {}
+    } catch (_err) {
+      console.warn("axon-engram failed to read instructions", { file: full, error: String(_err) })
+    }
   }
   cachedInstructions.set(key, "")
   return ""
