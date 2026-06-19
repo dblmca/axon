@@ -1,0 +1,49 @@
+{
+  "graph": {
+    "id": "orca-axon-d915e949",
+    "title": null,
+    "status": null
+  },
+  "task": {
+    "id": 426,
+    "title": "RS-2: Audit and add lifecycle integration tests",
+    "objective": "RS-1 (test harness fix) has already been merged to main. Audit the existing test suite for post-refactor API drift (modules moved into lib/ on Jun 15-16) — repair if needed. Then add lifecycle.js integration tests covering ensureSession, finalizeSession, drain, shutdown using the existing mock-fetch pattern. You MUST make the code changes and commit them.",
+    "status": "pending",
+    "priority": "normal"
+  },
+  "dependency_state": {
+    "after": [],
+    "blocked_by": []
+  },
+  "file_ownership_hints": [],
+  "acceptance_checks": [
+    "existing tests repaired for post-refactor API",
+    "new lifecycle tests for ensureSession/finalizeSession/drain/shutdown",
+    "all tests pass",
+    "changes committed"
+  ],
+  "claim_policy": {
+    "task_id": 426,
+    "graph_id": "orca-axon-d915e949",
+    "assignment_policy": "open_lowest_capable",
+    "required_capabilities": [],
+    "preferred_capabilities": [],
+    "required_role": null,
+    "required_model_class": null,
+    "min_model_tier": 0,
+    "max_cost_tier": 99,
+    "risk_level": "low",
+    "worktree_branch": null,
+    "file_ownership_hints": [],
+    "acceptance_checks": [
+      "existing tests repaired for post-refactor API",
+      "new lifecycle tests for ensureSession/finalizeSession/drain/shutdown",
+      "all tests pass",
+      "changes committed"
+    ],
+    "payload": {},
+    "created_at_epoch": "1781877075728",
+    "updated_at_epoch": "1781877075728"
+  },
+  "file_views": []
+}
