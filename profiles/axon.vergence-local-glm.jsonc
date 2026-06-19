@@ -1,0 +1,83 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // GLM 5.2 via OpenRouter driving LOCAL vergence MCP tools.
+  // For benchmarking against DS V4 Pro local run.
+  "enabled_providers": ["openrouter"],
+  "model": "openrouter/z-ai/glm-5.2",
+  "small_model": "openrouter/z-ai/glm-5.2",
+
+  "provider": {
+    "openrouter": {
+      "name": "OpenRouter",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://openrouter.ai/api/v1",
+        "apiKey": "{env:OPENROUTER_API_KEY}",
+        "timeout": 600000
+      },
+      "models": {
+        "z-ai/glm-5.2": {
+          "name": "GLM 5.2",
+          "family": "glm",
+          "attachment": true,
+          "reasoning": true,
+          "temperature": true,
+          "tool_call": true,
+          "limit": {
+            "context": 262144,
+            "output": 262144
+          },
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          }
+        }
+      }
+    }
+  },
+
+  "tools": {
+    "task": false,
+    "skill": false,
+    "todowrite": false,
+    "webfetch": false,
+    "websearch": false,
+    "codesearch": false
+  },
+
+  "permission": {
+    "engram_*": "allow",
+    "vergence_*": "allow",
+    "jcodemunch_*": "allow",
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow"
+  },
+
+  "mcp": {
+    "engram": {
+      "type": "local",
+      "command": ["node", "{env:AXON_ENGRAM_MCP_SERVER}"],
+      "environment": {
+        "ENGRAM_API_KEY": "{env:ENGRAM_API_KEY}",
+        "ENGRAM_WORKER_URL": "{env:ENGRAM_WORKER_URL}",
+        "ENGRAM_AGENT_RUNTIME": "axon"
+      },
+      "enabled": false,
+      "timeout": 10000
+    },
+    "vergence": {
+      "type": "local",
+      "command": ["/home/mmca/envs/vergence/bin/python", "/home/mmca/vergence/vergence-mcp/server_v2.py"],
+      "enabled": true,
+      "timeout": 1200000
+    },
+    "jcodemunch": {
+      "type": "local",
+      "command": ["/home/mmca/envs/jcodemunch/bin/jcodemunch-mcp", "serve"],
+      "enabled": true,
+      "timeout": 10000
+    }
+  }
+}

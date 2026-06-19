@@ -95,7 +95,7 @@ echo ""
 # 5. Smoke test (optional, only if --test flag)
 if [[ "${1:-}" == "--test" ]]; then
     echo "[5/5] Smoke test..."
-    ssh "$REMOTE" "export BUN_INSTALL=\$HOME/.bun && export PATH=\$BUN_INSTALL/bin:\$PATH && cd $REMOTE_DIR && AXON_DRY_RUN=1 bin/axon --profile cloud-glm run 'test'" 2>&1
+    ssh "$REMOTE" "export BUN_INSTALL=\$HOME/.bun && export PATH=\$BUN_INSTALL/bin:\$PATH && cd $REMOTE_DIR && AXON_DRY_RUN=1 bin/axon --profile remote-glm run 'test'" 2>&1
 else
     echo "[5/5] Skipping smoke test (use --test to run)"
 fi
