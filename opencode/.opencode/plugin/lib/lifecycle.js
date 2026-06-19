@@ -6,6 +6,53 @@ const DRAIN_TIMEOUT_MS = 5_000
 const SESSION_TTL_MS = 3_600_000
 const MAX_INFLIGHT = 20
 
+const CIRCUIT_THRESHOLD = 5
+const CIRCUIT_COOLDOWN_MS = 30_000
+const circuit = { failures: 0, lastFailure: 0, open: false }
+
+async function requestWithRetry(runtime, endpoint, init = {}, maxRetries = 3) {
+  if (circuit.open) {
+    if (Date.now() - circuit.lastFailure > CIRCUIT_COOLDOWN_MS) {
+      circuit.open = false
+      circuit.failures = 0
+    } else {
+      return { ok: false, status: 0, _circuit_open: true }
+    }
+  }
+
+  let lastError
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await request(runtime, endpoint, init)
+      if (result.ok || (result.status >= 400 && result.status < 500)) {
+        if (result.ok) circuit.failures = 0
+        return result
+      }
+      lastError = result
+    } catch (err) {
+      lastError = { ok: false, status: 0, _error: errorMessage(err) }
+    }
+
+    if (attempt < maxRetries) {
+      const baseDelay = Math.pow(2, attempt) * 200
+      const jitter = baseDelay * (0.5 + Math.random())
+      await new Promise((r) => setTimeout(r, jitter))
+    }
+  }
+
+  circuit.failures++
+  circuit.lastFailure = Date.now()
+  if (circuit.failures >= CIRCUIT_THRESHOLD) {
+    circuit.open = true
+    console.warn("axon-engram circuit breaker opened", {
+      failures: circuit.failures,
+      threshold: CIRCUIT_THRESHOLD,
+      endpoint,
+    })
+  }
+  return lastError || { ok: false, status: 0 }
+}
+
 export const sessionState = new Map()
 export const inflight = new Set()
 export let shuttingDown = false
@@ -71,7 +118,15 @@ export function background(input, promise, message, extra = {}) {
   const tracked = promise.catch((error) =>
     log(input, "WARN", message, { ...extra, error: errorMessage(error) }),
   )
-  if (shuttingDown || inflight.size >= MAX_INFLIGHT) return
+  if (shuttingDown || inflight.size >= MAX_INFLIGHT) {
+    if (!shuttingDown) {
+      log(input, "WARN", "backpressure: dropped request at MAX_INFLIGHT", {
+        inflight: inflight.size,
+        max: MAX_INFLIGHT,
+      })
+    }
+    return
+  }
   inflight.add(tracked)
   tracked.finally(() => inflight.delete(tracked))
 }
@@ -92,7 +147,7 @@ export async function syncAgent(input, runtime, sessionID) {
   const project = projectName(input)
   const tmux = tmuxSession()
   await Promise.allSettled([
-    request(runtime, "/api/agents/register", {
+    requestWithRetry(runtime, "/api/agents/register", {
       method: "POST",
       body: {
         name: current.agentName,
@@ -124,7 +179,7 @@ export async function ensureSession(input, runtime, sessionID) {
   current.agentName = current.agentName || agentName(input, runtime)
   current.initializing = (async () => {
     const project = projectName(input)
-    const init = await request(runtime, "/api/sessions/init", {
+    const init = await requestWithRetry(runtime, "/api/sessions/init", {
       method: "POST",
       body: {
         sdk_session_id: effectiveID,
