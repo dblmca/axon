@@ -1,0 +1,51 @@
+{
+  "graph": {
+    "id": "orca-axon-d915e949",
+    "title": null,
+    "status": null
+  },
+  "task": {
+    "id": 425,
+    "title": "RS-3 + RS-5: Add retry with jitter to Engram API calls and backpressure logging",
+    "objective": "Add retry with jitter + circuit-breaking to session-init and register calls, confirming Engram API idempotency first. Be conservative on heartbeat retries. Add a backpressure log when background() drops a request at MAX_INFLIGHT=20. Design retry and backpressure together to avoid fleet retry storms. You MUST make the code changes and commit them.",
+    "status": "pending",
+    "priority": "normal"
+  },
+  "dependency_state": {
+    "after": [],
+    "blocked_by": []
+  },
+  "file_ownership_hints": [],
+  "acceptance_checks": [
+    "retry with jitter on session-init/register",
+    "circuit-breaking prevents retry storms",
+    "backpressure log on MAX_INFLIGHT drop",
+    "existing tests still pass",
+    "changes committed"
+  ],
+  "claim_policy": {
+    "task_id": 425,
+    "graph_id": "orca-axon-d915e949",
+    "assignment_policy": "open_lowest_capable",
+    "required_capabilities": [],
+    "preferred_capabilities": [],
+    "required_role": null,
+    "required_model_class": null,
+    "min_model_tier": 0,
+    "max_cost_tier": 99,
+    "risk_level": "low",
+    "worktree_branch": null,
+    "file_ownership_hints": [],
+    "acceptance_checks": [
+      "retry with jitter on session-init/register",
+      "circuit-breaking prevents retry storms",
+      "backpressure log on MAX_INFLIGHT drop",
+      "existing tests still pass",
+      "changes committed"
+    ],
+    "payload": {},
+    "created_at_epoch": "1781877075680",
+    "updated_at_epoch": "1781877075680"
+  },
+  "file_views": []
+}
