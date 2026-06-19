@@ -245,11 +245,11 @@ launch() {
     exit 1
   fi
 
-  if [[ "$PROFILE_NAME" != "minimal-offline" && -z "${ENGRAM_API_KEY:-}" ]]; then
+  if [[ "$PROFILE_NAME" != "minimal-offline" && ! "$PROFILE_NAME" =~ ^remote- && -z "${ENGRAM_API_KEY:-}" ]]; then
     echo "ENGRAM_API_KEY is required for profile '$PROFILE_NAME'." >&2
     exit 1
   fi
-  if [[ "$PROFILE_NAME" == "cloud-deepseek" && -z "${DEEPSEEK_API_KEY:-}" ]]; then
+  if [[ ("$PROFILE_NAME" == "cloud-deepseek" || "$PROFILE_NAME" == "remote-deepseek") && -z "${DEEPSEEK_API_KEY:-}" ]]; then
     echo "DEEPSEEK_API_KEY is required for profile '$PROFILE_NAME'." >&2
     exit 1
   fi
