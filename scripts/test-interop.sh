@@ -11,16 +11,27 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 PROFILE="$ROOT/profiles/axon.vector-qwen-engram.jsonc"
 AGENT_NAME="axon-interop-test-$$"
+AGENT_NAME_B="claude-interop-test-$$"
+AGENT_NAME_C="codex-interop-test-$$"
 SESSION_ID="interop-test-session-$$"
 API="${ENGRAM_WORKER_URL%/}"
 PASS=0
 FAIL=0
 TASK_ID=""
 CHANNEL_ID=""
+GRAPH_ID="interop-graph-$$"
+TASK_IDS=()
+FILE_LOCK_PATH="/interop/test-lock-$$.txt"
+FILE_LOCK_ID=""
 
 cleanup() {
   echo ""
   echo "--- Cleanup ---"
+  for tid in "${TASK_IDS[@]}"; do
+    curl -fsS -H "x-api-key: $ENGRAM_API_KEY" -X DELETE "$API/api/tasks/$tid" \
+      -H "Content-Type: application/json" -d "{\"agent_name\":\"$AGENT_NAME\"}" >/dev/null 2>&1 || true
+    echo "Deleted task $tid"
+  done
   if [[ -n "$TASK_ID" ]]; then
     curl -fsS -H "x-api-key: $ENGRAM_API_KEY" -X DELETE "$API/api/tasks/$TASK_ID" \
       -H "Content-Type: application/json" -d "{\"agent_name\":\"$AGENT_NAME\"}" >/dev/null 2>&1 || true
@@ -31,9 +42,16 @@ cleanup() {
       -H "Content-Type: application/json" -d "{\"agent_name\":\"$AGENT_NAME\"}" >/dev/null 2>&1 || true
     echo "Archived test channel $CHANNEL_ID"
   fi
-  curl -fsS -H "x-api-key: $ENGRAM_API_KEY" -X POST "$API/api/agents/deregister" \
-    -H "Content-Type: application/json" -d "{\"name\":\"$AGENT_NAME\"}" >/dev/null 2>&1 || true
-  echo "Deregistered $AGENT_NAME"
+  if [[ -n "$FILE_LOCK_ID" ]]; then
+    curl -fsS -H "x-api-key: $ENGRAM_API_KEY" -X DELETE "$API/api/file-locks/$FILE_LOCK_ID" \
+      -H "Content-Type: application/json" -d "{\"agent_name\":\"$AGENT_NAME\"}" >/dev/null 2>&1 || true
+    echo "Released file lock $FILE_LOCK_ID"
+  fi
+  for agent in "$AGENT_NAME" "$AGENT_NAME_B" "$AGENT_NAME_C"; do
+    curl -fsS -H "x-api-key: $ENGRAM_API_KEY" -X POST "$API/api/agents/deregister" \
+      -H "Content-Type: application/json" -d "{\"name\":\"$agent\"}" >/dev/null 2>&1 || true
+  done
+  echo "Deregistered agents"
   rm -rf "$smoke_dir" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -215,6 +233,168 @@ if echo "$ctx_resp" | grep -q '"project"'; then
 else
   report "context_retrieval" "FAIL"
   echo "    Response: $ctx_resp"
+fi
+echo ""
+
+# --- Test f: Shared Task Graph ---
+echo "=== Test f: Shared Task Graph ==="
+
+GRAPH_ID="interop-graph-$$-$(date +%s)"
+graph_tasks=()
+
+for slot in alpha beta gamma; do
+  task_marker="graph-task-${slot}-$$"
+  task_resp=$(curl -fsS -H "x-api-key: $ENGRAM_API_KEY" -X POST "$API/api/tasks" \
+    -H "Content-Type: application/json" \
+    -d "{\"title\":\"$task_marker\",\"project\":\"axon\",\"created_by\":\"$AGENT_NAME\",\"description\":\"graph interop test task ${slot}\",\"graph_id\":\"$GRAPH_ID\"}" 2>&1) || true
+
+  tid=$(echo "$task_resp" | grep -oP '"id":\s*\K\d+' | head -1) || true
+  if [[ -n "$tid" ]]; then
+    TASK_IDS+=("$tid")
+    graph_tasks+=("$tid")
+  fi
+done
+
+if [[ "${#graph_tasks[@]}" -eq 3 ]]; then
+  report "graph_tasks_created" "PASS"
+else
+  report "graph_tasks_created" "FAIL"
+  echo "    Expected 3 tasks, got ${#graph_tasks[@]}"
+fi
+
+graph_list_resp=$(curl -fsS -H "x-api-key: $ENGRAM_API_KEY" \
+  "$API/api/tasks?project=axon&graph_id=$GRAPH_ID&limit=50" 2>&1) || true
+
+graph_found=0
+for tid in "${graph_tasks[@]}"; do
+  if echo "$graph_list_resp" | grep -qF "$tid"; then
+    graph_found=$((graph_found + 1))
+  fi
+done
+
+if [[ "$graph_found" -eq 3 ]]; then
+  report "graph_tasks_visible_by_graph_id" "PASS"
+else
+  report "graph_tasks_visible_by_graph_id" "FAIL"
+  echo "    Expected 3 tasks visible, found $graph_found"
+fi
+echo ""
+
+# --- Test g: Task Claim ---
+echo "=== Test g: Task Claim ==="
+
+claim_target="${graph_tasks[0]}"
+claim_resp=$(curl -fsS -H "x-api-key: $ENGRAM_API_KEY" -X PATCH "$API/api/tasks/$claim_target" \
+  -H "Content-Type: application/json" \
+  -d "{\"status\":\"in_progress\",\"assigned_to\":\"$AGENT_NAME\"}" 2>&1) || true
+
+if echo "$claim_resp" | grep -qF '"in_progress"'; then
+  report "task_claim_patch" "PASS"
+else
+  report "task_claim_patch" "FAIL"
+  echo "    Response: $claim_resp"
+fi
+
+claim_verify_resp=$(curl -fsS -H "x-api-key: $ENGRAM_API_KEY" \
+  "$API/api/tasks?project=axon&graph_id=$GRAPH_ID&limit=50" 2>&1) || true
+
+if echo "$claim_verify_resp" | grep -qF '"in_progress"'; then
+  report "task_claim_visible" "PASS"
+else
+  report "task_claim_visible" "FAIL"
+  echo "    Response: $claim_verify_resp"
+fi
+
+# Second agent (Claude) claims another task in the same graph
+curl -fsS -H "x-api-key: $ENGRAM_API_KEY" -X POST "$API/api/agents/register" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"$AGENT_NAME_B\",\"session_id\":\"$SESSION_ID-claude\",\"hostname\":\"interop-test\",\"project\":\"axon\",\"source_ai\":\"claude\"}" >/dev/null 2>&1 || true
+
+if [[ "${#graph_tasks[@]}" -ge 2 ]]; then
+  claim_target_b="${graph_tasks[1]}"
+  claim_b_resp=$(curl -fsS -H "x-api-key: $ENGRAM_API_KEY" -X PATCH "$API/api/tasks/$claim_target_b" \
+    -H "Content-Type: application/json" \
+    -d "{\"status\":\"in_progress\",\"assigned_to\":\"$AGENT_NAME_B\"}" 2>&1) || true
+
+  if echo "$claim_b_resp" | grep -qF '"in_progress"'; then
+    report "task_cross_agent_claim" "PASS"
+  else
+    report "task_cross_agent_claim" "FAIL"
+    echo "    Response: $claim_b_resp"
+  fi
+else
+  report "task_cross_agent_claim" "FAIL"
+  echo "    Not enough graph tasks to test cross-agent claim"
+fi
+
+# Verify both agents appear as assignees in the graph
+graph_agents_resp=$(curl -fsS -H "x-api-key: $ENGRAM_API_KEY" \
+  "$API/api/tasks?project=axon&graph_id=$GRAPH_ID&limit=50" 2>&1) || true
+
+if echo "$graph_agents_resp" | grep -qF "$AGENT_NAME" && echo "$graph_agents_resp" | grep -qF "$AGENT_NAME_B"; then
+  report "graph_cross_agent_visibility" "PASS"
+else
+  report "graph_cross_agent_visibility" "FAIL"
+  echo "    Response: $graph_agents_resp"
+fi
+echo ""
+
+# --- Test h: File Lock ---
+echo "=== Test h: File Lock ==="
+
+FILE_LOCK_PATH="/interop/test-lock-$$-$(date +%s)"
+
+lock_create_resp=$(curl -fsS -H "x-api-key: $ENGRAM_API_KEY" -X POST "$API/api/file-locks" \
+  -H "Content-Type: application/json" \
+  -d "{\"path\":\"$FILE_LOCK_PATH\",\"project\":\"axon\",\"created_by\":\"$AGENT_NAME\"}" 2>&1) || true
+
+FILE_LOCK_ID=$(echo "$lock_create_resp" | grep -oP '"id":\s*\K\d+' | head -1) || true
+
+if [[ -n "$FILE_LOCK_ID" ]]; then
+  report "file_lock_create" "PASS"
+else
+  report "file_lock_create" "FAIL"
+  echo "    Response: $lock_create_resp"
+fi
+
+if [[ -n "$FILE_LOCK_ID" ]]; then
+  lock_acquire_resp=$(curl -fsS -H "x-api-key: $ENGRAM_API_KEY" \
+    -X POST "$API/api/file-locks/$FILE_LOCK_ID/acquire" \
+    -H "Content-Type: application/json" \
+    -d "{\"agent_name\":\"$AGENT_NAME\"}" 2>&1) || true
+
+  if echo "$lock_acquire_resp" | grep -qF "$AGENT_NAME"; then
+    report "file_lock_acquire" "PASS"
+  else
+    report "file_lock_acquire" "FAIL"
+    echo "    Response: $lock_acquire_resp"
+  fi
+
+  lock_list_resp=$(curl -fsS -H "x-api-key: $ENGRAM_API_KEY" \
+    "$API/api/file-locks?project=axon" 2>&1) || true
+
+  if echo "$lock_list_resp" | grep -qF "$FILE_LOCK_PATH"; then
+    report "file_lock_visible" "PASS"
+  else
+    report "file_lock_visible" "FAIL"
+    echo "    Response: $lock_list_resp"
+  fi
+
+  lock_release_resp=$(curl -fsS -H "x-api-key: $ENGRAM_API_KEY" \
+    -X POST "$API/api/file-locks/$FILE_LOCK_ID/release" \
+    -H "Content-Type: application/json" \
+    -d "{\"agent_name\":\"$AGENT_NAME\"}" 2>&1) || true
+
+  if echo "$lock_release_resp" | grep -q '"released"'; then
+    report "file_lock_release" "PASS"
+  else
+    report "file_lock_release" "FAIL"
+    echo "    Response: $lock_release_resp"
+  fi
+else
+  report "file_lock_acquire" "FAIL"
+  report "file_lock_visible" "FAIL"
+  report "file_lock_release" "FAIL"
 fi
 echo ""
 
