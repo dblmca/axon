@@ -1,0 +1,49 @@
+{
+  "graph": {
+    "id": "orca-axon-e1148c13",
+    "title": null,
+    "status": null
+  },
+  "task": {
+    "id": 424,
+    "title": "RS-4 + TD-3: Fix silent catch blocks and consolidate legacy scripts",
+    "objective": "Replace the 4 genuinely-silent bare catch{} with structured logging (identity.js:78,207; util.js:101; context.js:24). Leave the 3 deliberate fire-and-forget catches (.catch(()=>{}) in lifecycle.js:67,190; axon-engram.js:87) but add debug visibility. Also consolidate/remove legacy run-*.sh launchers after updating CLAUDE.md references. You MUST make the code changes and commit them.",
+    "status": "pending",
+    "priority": "normal"
+  },
+  "dependency_state": {
+    "after": [],
+    "blocked_by": []
+  },
+  "file_ownership_hints": [],
+  "acceptance_checks": [
+    "no bare catch{} blocks remain",
+    "debug logging on fire-and-forget catches",
+    "legacy run-*.sh scripts removed or consolidated",
+    "changes committed to branch"
+  ],
+  "claim_policy": {
+    "task_id": 424,
+    "graph_id": "orca-axon-e1148c13",
+    "assignment_policy": "open_lowest_capable",
+    "required_capabilities": [],
+    "preferred_capabilities": [],
+    "required_role": null,
+    "required_model_class": null,
+    "min_model_tier": 0,
+    "max_cost_tier": 99,
+    "risk_level": "low",
+    "worktree_branch": null,
+    "file_ownership_hints": [],
+    "acceptance_checks": [
+      "no bare catch{} blocks remain",
+      "debug logging on fire-and-forget catches",
+      "legacy run-*.sh scripts removed or consolidated",
+      "changes committed to branch"
+    ],
+    "payload": {},
+    "created_at_epoch": "1781873181476",
+    "updated_at_epoch": "1781873181476"
+  },
+  "file_views": []
+}
