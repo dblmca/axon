@@ -13,7 +13,7 @@ import {
   errorMessage,
   cleanText,
   json,
-} from "./lib/util.js"
+} from "./util.js"
 
 // identity.js
 import {
@@ -28,7 +28,7 @@ import {
   agentProfile,
   projectName,
   mcpNames,
-} from "./lib/identity.js"
+} from "./identity.js"
 
 // lifecycle.js
 import {
@@ -36,7 +36,7 @@ import {
   noteModel,
   resolveSessionID,
   taskDescription,
-} from "./lib/lifecycle.js"
+} from "./lifecycle.js"
 
 // capture.js
 import {
@@ -44,10 +44,10 @@ import {
   toolType,
   toolTitle,
   sessionIDFromEvent,
-} from "./lib/capture.js"
+} from "./capture.js"
 
 // context.js
-import { budgetAppend, loadInstructions } from "./lib/context.js"
+import { budgetAppend, loadInstructions } from "./context.js"
 
 // --- util tests ---
 describe("util: asRecord", () => {
@@ -176,7 +176,16 @@ describe("identity: inferredModel", () => {
     expect(r.className).toBe("qwen3")
   })
   it("defaults to axon", () => {
+    const deepseek = process.env.AXON_DEEPSEEK_MODEL
+    const openrouter = process.env.AXON_OPENROUTER_MODEL
+    const qwen = process.env.AXON_QWEN_MODEL_ID
+    delete process.env.AXON_DEEPSEEK_MODEL
+    delete process.env.AXON_OPENROUTER_MODEL
+    delete process.env.AXON_QWEN_MODEL_ID
     const r = inferredModel({ modelLabel: "", modelProviderID: "", modelID: "" }, {})
+    process.env.AXON_DEEPSEEK_MODEL = deepseek
+    process.env.AXON_OPENROUTER_MODEL = openrouter
+    process.env.AXON_QWEN_MODEL_ID = qwen
     expect(r.className).toBe("axon")
   })
 })
