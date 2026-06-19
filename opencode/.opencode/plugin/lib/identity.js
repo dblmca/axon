@@ -75,7 +75,9 @@ export function loadAgentConfig(worktree) {
         cachedAgentConfig.set(key, parsed)
         return parsed
       }
-    } catch {}
+    } catch (_err) {
+      console.warn("axon-engram failed to parse agent config", { file: full, error: String(_err) })
+    }
   }
   cachedAgentConfig.set(key, null)
   return null
@@ -204,7 +206,9 @@ export function capabilities(input, runtime, current) {
       if (parsed?.mcpServers && typeof parsed.mcpServers === "object") {
         local.push(...Object.keys(parsed.mcpServers))
       }
-    } catch {}
+    } catch (_err) {
+      console.warn("axon-engram failed to parse mcp.json", { file, error: String(_err) })
+    }
   }
   const agentCfg = loadAgentConfig(input.worktree)
   const cfgCaps = configCapabilities(agentCfg)

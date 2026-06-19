@@ -64,7 +64,7 @@ export function taskDescription(sessionID) {
 export function log(input, level, message, extra = {}) {
   return input.client.app
     .log({ body: { service: SERVICE, level, message, extra } })
-    .catch(() => {})
+    .catch((_err) => { console.debug("axon-engram log delivery failed", String(_err)) })
 }
 
 export function background(input, promise, message, extra = {}) {
@@ -187,7 +187,7 @@ export function installShutdownHandlers(input, runtime) {
           request(runtime, "/api/agents/deregister", {
             method: "POST",
             body: { name: current.agentName, session_id: sessionID },
-          }).catch(() => {}),
+          }).catch((_err) => { console.debug("axon-engram shutdown deregister failed", String(_err)) }),
         )
       }
       await Promise.allSettled(deregistrations)

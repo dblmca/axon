@@ -98,7 +98,9 @@ export async function request(runtime, endpoint, init = {}) {
     let data
     try {
       data = await response.json()
-    } catch {}
+    } catch (_err) {
+      console.warn("axon-engram failed to parse response body", { endpoint, error: String(_err) })
+    }
     return { ok: response.ok, status: response.status, data }
   } finally {
     clearTimeout(timeout)
