@@ -76,7 +76,11 @@ export function loadAgentConfig(worktree) {
         return parsed
       }
     } catch (_err) {
-      console.warn("axon-engram failed to parse agent config", { file: full, error: String(_err) })
+      if (_err?.code === "ENOENT") {
+        console.debug("axon-engram agent config file not found", { file: full })
+      } else {
+        console.warn("axon-engram failed to parse agent config", { file: full, error: String(_err) })
+      }
     }
   }
   cachedAgentConfig.set(key, null)

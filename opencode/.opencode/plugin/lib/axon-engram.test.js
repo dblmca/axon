@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 
 // util.js
 import {
@@ -36,6 +36,7 @@ import {
   noteModel,
   resolveSessionID,
   taskDescription,
+  resetCircuit,
 } from "./lifecycle.js"
 
 // capture.js
@@ -48,6 +49,12 @@ import {
 
 // context.js
 import { budgetAppend, loadInstructions } from "./context.js"
+
+// Reset circuit breaker state between tests so failures in one test don't
+// bleed into the next.
+afterEach(() => {
+  resetCircuit()
+})
 
 // --- util tests ---
 describe("util: asRecord", () => {
@@ -183,9 +190,9 @@ describe("identity: inferredModel", () => {
     delete process.env.AXON_OPENROUTER_MODEL
     delete process.env.AXON_QWEN_MODEL_ID
     const r = inferredModel({ modelLabel: "", modelProviderID: "", modelID: "" }, {})
-    process.env.AXON_DEEPSEEK_MODEL = deepseek
-    process.env.AXON_OPENROUTER_MODEL = openrouter
-    process.env.AXON_QWEN_MODEL_ID = qwen
+    if (deepseek !== undefined) process.env.AXON_DEEPSEEK_MODEL = deepseek; else delete process.env.AXON_DEEPSEEK_MODEL
+    if (openrouter !== undefined) process.env.AXON_OPENROUTER_MODEL = openrouter; else delete process.env.AXON_OPENROUTER_MODEL
+    if (qwen !== undefined) process.env.AXON_QWEN_MODEL_ID = qwen; else delete process.env.AXON_QWEN_MODEL_ID
     expect(r.className).toBe("axon")
   })
 })

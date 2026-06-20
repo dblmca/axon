@@ -22,7 +22,11 @@ export function loadInstructions(worktree) {
         return wrapped
       }
     } catch (_err) {
-      console.warn("axon-engram failed to read instructions", { file: full, error: String(_err) })
+      if (_err?.code === "ENOENT") {
+        console.debug("axon-engram instructions file not found", { file: full })
+      } else {
+        console.warn("axon-engram failed to read instructions", { file: full, error: String(_err) })
+      }
     }
   }
   cachedInstructions.set(key, "")

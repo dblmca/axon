@@ -24,8 +24,23 @@ async function requestWithRetry(runtime, endpoint, init = {}, maxRetries = 3) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const result = await request(runtime, endpoint, init)
-      if (result.ok || (result.status >= 400 && result.status < 500)) {
-        if (result.ok) circuit.failures = 0
+      if (result.ok) {
+        circuit.failures = 0
+        return result
+      }
+      if (result.status === 429) {
+        lastError = result
+        if (attempt < maxRetries) {
+          const retryAfterMs = (() => {
+            const header = result.data?.retryAfter ?? result.headers?.get?.("retry-after")
+            const secs = header ? Number(header) : NaN
+            return isNaN(secs) ? Math.pow(2, attempt) * 200 * (0.5 + Math.random()) : secs * 1_000
+          })()
+          await new Promise((r) => setTimeout(r, retryAfterMs))
+        }
+        continue
+      }
+      if (result.status >= 400 && result.status < 500) {
         return result
       }
       lastError = result
@@ -51,6 +66,12 @@ async function requestWithRetry(runtime, endpoint, init = {}, maxRetries = 3) {
     })
   }
   return lastError || { ok: false, status: 0 }
+}
+
+export function resetCircuit() {
+  circuit.failures = 0
+  circuit.lastFailure = 0
+  circuit.open = false
 }
 
 export const sessionState = new Map()
