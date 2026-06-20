@@ -353,9 +353,13 @@ case "$CMD" in
       run_args+=(--dangerously-skip-permissions)
     fi
 
-    # Watchdog: if AXON_WATCHDOG_TIMEOUT is set (seconds), monitor for hangs
-    # and failover to OpenRouter profile on timeout.
-    WATCHDOG_TIMEOUT="${AXON_WATCHDOG_TIMEOUT:-0}"
+    # Watchdog: auto-enabled for *-direct profiles (300s default).
+    # Override with AXON_WATCHDOG_TIMEOUT env var. Set to 0 to disable.
+    if [[ "$PROFILE_NAME" =~ -direct$ && -z "${AXON_WATCHDOG_TIMEOUT+x}" ]]; then
+      WATCHDOG_TIMEOUT=300
+    else
+      WATCHDOG_TIMEOUT="${AXON_WATCHDOG_TIMEOUT:-0}"
+    fi
     FALLBACK_PROFILES="cloud-glm-direct:cloud-glm remote-glm-direct:remote-glm"
 
     if [[ "$WATCHDOG_TIMEOUT" -gt 0 ]]; then
