@@ -20,7 +20,7 @@ if [[ -f "$AXON_ENV" ]]; then
 fi
 
 # --- Profile selection ---
-PROFILE_NAME="${AXON_PROFILE:-cloud-glm}"
+PROFILE_NAME="${AXON_PROFILE:-cloud-glm-direct}"
 PROFILE_SPECIFIED=false
 MODEL_OVERRIDE=""
 PROJECT_OVERRIDE=""
