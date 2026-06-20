@@ -150,7 +150,7 @@ model_short() {
     m="${AXON_OPENROUTER_MODEL:-unset}"
   elif [[ "$PROFILE_NAME" == "cloud-deepseek" || "$PROFILE_NAME" == "remote-deepseek" ]]; then
     m="${AXON_DEEPSEEK_MODEL:-unset}"
-  elif [[ "$PROFILE_NAME" == "cloud-glm" || "$PROFILE_NAME" == "remote-glm" ]]; then
+  elif [[ "$PROFILE_NAME" =~ glm ]]; then
     m="glm-5.2"
   else
     m="${AXON_QWEN_MODEL_ID%.gguf}"

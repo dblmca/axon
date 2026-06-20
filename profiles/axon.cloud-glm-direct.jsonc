@@ -1,0 +1,121 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // GLM 5.2 via Z.ai direct API (Coding Plan $18/mo — included usage).
+  // MCP connects via CF tunnel (local/cloud variant).
+  "enabled_providers": ["zai"],
+  "model": "zai/glm-5.2",
+  "small_model": "zai/glm-5.2",
+
+  "provider": {
+    "zai": {
+      "name": "Z.AI",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://api.z.ai/api/coding/paas/v4",
+        "apiKey": "{env:Z_AI_API_KEY}",
+        "timeout": 600000
+      },
+      "models": {
+        "glm-5.2": {
+          "name": "GLM 5.2",
+          "family": "glm",
+          "attachment": true,
+          "reasoning": true,
+          "temperature": true,
+          "tool_call": true,
+          "limit": {
+            "context": 262144,
+            "output": 262144
+          },
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          }
+        }
+      }
+    }
+  },
+
+  "tools": {
+    "task": false,
+    "skill": false,
+    "todowrite": false,
+    "webfetch": false,
+    "websearch": false,
+    "codesearch": false
+  },
+
+  "permission": {
+    "agentic-mcp_*": "deny",
+
+    "engram_*": "ask",
+    "engram_status": "allow",
+    "engram_search": "allow",
+    "engram_recall": "allow",
+    "engram_context": "allow",
+    "engram_decisions": "allow",
+    "engram_note": "allow",
+    "engram_working_memory": "allow",
+    "engram_inbox": "allow",
+    "engram_ack": "allow",
+    "engram_send": "allow",
+    "engram_handoff": "allow",
+    "engram_agents": "allow",
+    "engram_experts": "allow",
+    "engram_channel": "allow",
+    "engram_task": "allow",
+    "engram_context_window": "allow",
+    "engram_file_lock": "allow",
+    "engram_orchestrate": "allow",
+    "engram_schedule": "allow",
+    "engram_remind": "allow",
+    "engram_wiki": "allow",
+    "engram_graph": "allow",
+    "engram_dashboard": "allow",
+    "engram_notify": "allow",
+    "engram_forget": "allow",
+    "engram_instincts": "allow",
+
+    "jcodemunch_*": "allow",
+
+    "vergence-p_*": "allow"
+  },
+
+  "mcp": {
+    "engram": {
+      "type": "local",
+      "command": ["node", "{env:AXON_ENGRAM_MCP_SERVER}"],
+      "environment": {
+        "ENGRAM_API_KEY": "{env:ENGRAM_API_KEY}",
+        "ENGRAM_WORKER_URL": "{env:ENGRAM_WORKER_URL}",
+        "ENGRAM_AGENT_RUNTIME": "axon"
+      },
+      "enabled": false,
+      "timeout": 10000
+    },
+    "agentic-mcp": {
+      "type": "local",
+      "command": ["node", "{env:AXON_AGENTIC_MCP_SERVER}"],
+      "enabled": false,
+      "timeout": 10000
+    },
+    "jcodemunch": {
+      "type": "local",
+      "command": ["/home/mmca/envs/jcodemunch/bin/jcodemunch-mcp", "serve"],
+      "enabled": true,
+      "timeout": 10000
+    },
+    "vergence-p": {
+      "type": "remote",
+      "url": "https://vergence.emergent.tools/mcp/",
+      "headers": {
+        "Authorization": "Bearer {env:VERGENCE_MCP_TOKEN}",
+        "CF-Access-Client-Id": "97c23d8aebbdc3311d24f7c8d73091f3.access",
+        "CF-Access-Client-Secret": "7e6073249b3eb7d10cf6cd89cce04a265427bca28c51a714cc57b29413b1db25"
+      },
+      "enabled": true,
+      "timeout": 600000
+    }
+  }
+}
