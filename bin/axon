@@ -352,8 +352,66 @@ case "$CMD" in
     if skip_permissions_enabled; then
       run_args+=(--dangerously-skip-permissions)
     fi
-    launch "${run_args[@]}" "$@"
-    RUN_EXIT=$?
+
+    # Watchdog: if AXON_WATCHDOG_TIMEOUT is set (seconds), monitor for hangs
+    # and failover to OpenRouter profile on timeout.
+    WATCHDOG_TIMEOUT="${AXON_WATCHDOG_TIMEOUT:-0}"
+    FALLBACK_PROFILES="cloud-glm-direct:cloud-glm remote-glm-direct:remote-glm"
+
+    if [[ "$WATCHDOG_TIMEOUT" -gt 0 ]]; then
+      AXON_LOG="/tmp/axon-run-$$.log"
+      launch "${run_args[@]}" "$@" 2>&1 | tee "$AXON_LOG" &
+      LAUNCH_PID=$!
+
+      (
+        while kill -0 "$LAUNCH_PID" 2>/dev/null; do
+          sleep 10
+          if [[ -f "$AXON_LOG" ]]; then
+            LAST_MOD=$(stat -c '%Y' "$AXON_LOG" 2>/dev/null || echo 0)
+            NOW=$(date +%s)
+            IDLE=$(( NOW - LAST_MOD ))
+            if [[ "$IDLE" -ge "$WATCHDOG_TIMEOUT" ]]; then
+              echo "" >&2
+              echo "[watchdog] No output for ${IDLE}s (timeout=${WATCHDOG_TIMEOUT}s) — killing run" >&2
+              kill "$LAUNCH_PID" 2>/dev/null
+              break
+            fi
+          fi
+        done
+      ) &
+      WATCHDOG_PID=$!
+
+      wait "$LAUNCH_PID" 2>/dev/null
+      RUN_EXIT=$?
+      kill "$WATCHDOG_PID" 2>/dev/null 2>&1
+      wait "$WATCHDOG_PID" 2>/dev/null 2>&1
+
+      # If killed by watchdog (exit 137/143), try fallback profile
+      if [[ $RUN_EXIT -ge 128 ]]; then
+        FALLBACK=""
+        for pair in $FALLBACK_PROFILES; do
+          FROM="${pair%%:*}"
+          TO="${pair##*:}"
+          if [[ "$PROFILE_NAME" == "$FROM" ]]; then
+            FALLBACK="$TO"
+            break
+          fi
+        done
+        if [[ -n "$FALLBACK" ]]; then
+          FALLBACK_PROFILE="$ROOT/profiles/axon.${FALLBACK}.jsonc"
+          if [[ -f "$FALLBACK_PROFILE" ]]; then
+            echo "[watchdog] Failing over to profile: $FALLBACK" >&2
+            export OPENCODE_CONFIG_CONTENT="$(cat "$FALLBACK_PROFILE")"
+            launch "${run_args[@]}" "$@"
+            RUN_EXIT=$?
+          fi
+        fi
+      fi
+    else
+      launch "${run_args[@]}" "$@"
+      RUN_EXIT=$?
+    fi
+
     # Cleanup symlink + complete engram session
     [[ -n "$AXON_PLUGIN_CLEANUP" ]] && rm -f "$AXON_PLUGIN_CLEANUP"
     if [[ -z "${AXON_NO_ENGRAM:-}" && -n "${ENGRAM_API_KEY:-}" && -n "${ENGRAM_WORKER_URL:-}" ]]; then
