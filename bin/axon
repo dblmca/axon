@@ -111,8 +111,14 @@ if [[ -n "$MODEL_OVERRIDE" ]]; then
     cloud-openrouter)
       export AXON_OPENROUTER_MODEL="$MODEL_OVERRIDE"
       ;;
-    cloud-deepseek)
+    cloud-deepseek|remote-deepseek)
       export AXON_DEEPSEEK_MODEL="$MODEL_OVERRIDE"
+      ;;
+    *glm-direct*)
+      export Z_AI_MODEL_OVERRIDE="$MODEL_OVERRIDE"
+      ;;
+    *glm*)
+      export AXON_GLM_MODEL_OVERRIDE="$MODEL_OVERRIDE"
       ;;
     *)
       export AXON_QWEN_MODEL_ID="$MODEL_OVERRIDE"
@@ -150,7 +156,17 @@ model_short() {
     m="${AXON_OPENROUTER_MODEL:-unset}"
   elif [[ "$PROFILE_NAME" == "cloud-deepseek" || "$PROFILE_NAME" == "remote-deepseek" ]]; then
     m="${AXON_DEEPSEEK_MODEL:-unset}"
+  elif [[ "$PROFILE_NAME" =~ glm-direct ]]; then
+    if [[ -n "${Z_AI_MODEL_OVERRIDE:-}" ]]; then
+      echo "$Z_AI_MODEL_OVERRIDE"
+      return
+    fi
+    m="glm-5.2"
   elif [[ "$PROFILE_NAME" =~ glm ]]; then
+    if [[ -n "${AXON_GLM_MODEL_OVERRIDE:-}" ]]; then
+      echo "$AXON_GLM_MODEL_OVERRIDE"
+      return
+    fi
     m="glm-5.2"
   else
     m="${AXON_QWEN_MODEL_ID%.gguf}"
@@ -225,6 +241,7 @@ launch() {
   [[ -n "${ENGRAM_API_KEY:-}" ]] && export ENGRAM_API_KEY
   [[ -n "${OPENROUTER_API_KEY:-}" ]] && export OPENROUTER_API_KEY
   [[ -n "${DEEPSEEK_API_KEY:-}" ]] && export DEEPSEEK_API_KEY
+  [[ -n "${Z_AI_API_KEY:-}" ]] && export Z_AI_API_KEY
   export AXON_PROJECT_DIR
   export OPENCODE_CONFIG_CONTENT="$(cat "$PROFILE")"
 
@@ -251,6 +268,10 @@ launch() {
   fi
   if [[ ("$PROFILE_NAME" == "cloud-deepseek" || "$PROFILE_NAME" == "remote-deepseek") && -z "${DEEPSEEK_API_KEY:-}" ]]; then
     echo "DEEPSEEK_API_KEY is required for profile '$PROFILE_NAME'." >&2
+    exit 1
+  fi
+  if [[ "$PROFILE_NAME" =~ cloud-glm-direct|vergence-.*-glm-direct ]] && [[ -z "${Z_AI_API_KEY:-}" ]]; then
+    echo "Z_AI_API_KEY is required for profile '$PROFILE_NAME'." >&2
     exit 1
   fi
 
@@ -477,8 +498,10 @@ Commands:
 
 Options:
   --profile NAME    Select deployment profile (default: cloud-glm)
-                    Local:  cloud-glm, cloud-deepseek, cloud-openrouter, vector-qwen-engram, minimal-offline
-                    Remote: remote-glm, remote-deepseek
+                    Direct: cloud-glm-direct, cloud-deepseek
+                    Router: cloud-glm, cloud-openrouter
+                    Local:  vector-qwen-engram, minimal-offline
+                    Remote: remote-glm, remote-glm-direct, remote-deepseek
   --model SLUG      Override the selected profile model
   --project NAME    Override Engram project registration
   --task ID         Set task id for a run
@@ -495,6 +518,7 @@ Environment:
   AXON_DEEPSEEK_MODEL  DeepSeek model id (default: deepseek-v4-pro)
   DEEPSEEK_API_KEY     Required for cloud-deepseek profile
   OPENROUTER_API_KEY   Required for cloud-openrouter profile
+  Z_AI_API_KEY         Required for cloud-glm-direct profile ($18/mo flat)
   AXON_SKIP_PERMISSIONS Set to 1 to auto-approve headless run permissions
 HELP
     ;;

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // DeepSeek V4 Pro direct API driving LOCAL vergence MCP tools.
+  // For benchmarking against GLM 5.2 and Qwen3.6 local runs.
+  "enabled_providers": ["deepseek"],
+  "model": "deepseek/deepseek-v4-pro",
+  "small_model": "deepseek/deepseek-v4-pro",
+
+  "provider": {
+    "deepseek": {
+      "name": "DeepSeek",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://api.deepseek.com",
+        "apiKey": "{env:DEEPSEEK_API_KEY}",
+        "timeout": 600000
+      },
+      "models": {
+        "deepseek-v4-pro": {
+          "name": "DeepSeek V4 Pro",
+          "family": "deepseek",
+          "attachment": true,
+          "reasoning": true,
+          "temperature": true,
+          "tool_call": true,
+          "limit": {
+            "context": 1048576,
+            "output": 8192
+          },
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          }
+        }
+      }
+    }
+  },
+
+  "tools": {
+    "task": false,
+    "skill": false,
+    "todowrite": false,
+    "webfetch": false,
+    "websearch": false,
+    "codesearch": false
+  },
+
+  "permission": {
+    "engram_*": "allow",
+    "vergence_*": "allow",
+    "jcodemunch_*": "allow",
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow"
+  },
+
+  "mcp": {
+    "engram": {
+      "type": "local",
+      "command": ["node", "{env:AXON_ENGRAM_MCP_SERVER}"],
+      "environment": {
+        "ENGRAM_API_KEY": "{env:ENGRAM_API_KEY}",
+        "ENGRAM_WORKER_URL": "{env:ENGRAM_WORKER_URL}",
+        "ENGRAM_AGENT_RUNTIME": "axon"
+      },
+      "enabled": false,
+      "timeout": 10000
+    },
+    "vergence": {
+      "type": "local",
+      "command": ["/home/mmca/envs/vergence/bin/python", "/home/mmca/vergence/vergence-mcp/server_v2.py"],
+      "enabled": true,
+      "timeout": 1200000
+    },
+    "jcodemunch": {
+      "type": "local",
+      "command": ["/home/mmca/envs/jcodemunch/bin/jcodemunch-mcp", "serve"],
+      "enabled": true,
+      "timeout": 10000
+    }
+  }
+}
