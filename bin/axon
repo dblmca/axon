@@ -270,7 +270,7 @@ launch() {
     echo "DEEPSEEK_API_KEY is required for profile '$PROFILE_NAME'." >&2
     exit 1
   fi
-  if [[ "$PROFILE_NAME" =~ cloud-glm-direct|vergence-.*-glm-direct ]] && [[ -z "${Z_AI_API_KEY:-}" ]]; then
+  if [[ "$PROFILE_NAME" =~ glm-direct ]] && [[ -z "${Z_AI_API_KEY:-}" ]]; then
     echo "Z_AI_API_KEY is required for profile '$PROFILE_NAME'." >&2
     exit 1
   fi
@@ -381,12 +381,26 @@ case "$CMD" in
     else
       WATCHDOG_TIMEOUT="${AXON_WATCHDOG_TIMEOUT:-0}"
     fi
+    [[ "$WATCHDOG_TIMEOUT" =~ ^[0-9]+$ ]] || WATCHDOG_TIMEOUT=0
     FALLBACK_PROFILES="cloud-glm-direct:cloud-glm remote-glm-direct:remote-glm"
+    WATCHDOG_FIRED=false
 
     if [[ "$WATCHDOG_TIMEOUT" -gt 0 ]]; then
-      AXON_LOG="/tmp/axon-run-$$.log"
-      launch "${run_args[@]}" "$@" 2>&1 | tee "$AXON_LOG" &
+      AXON_LOG="$(mktemp "${TMPDIR:-/tmp}/axon-run.XXXXXX")"
+      chmod 600 "$AXON_LOG"
+      cleanup_watchdog() {
+        [[ -n "${TAIL_PID:-}" ]] && kill "$TAIL_PID" 2>/dev/null
+        [[ -n "${WATCHDOG_PID:-}" ]] && kill "$WATCHDOG_PID" 2>/dev/null
+        [[ -n "${LAUNCH_PID:-}" ]] && kill "$LAUNCH_PID" 2>/dev/null
+        rm -f "$AXON_LOG"
+        wait 2>/dev/null
+      }
+      trap cleanup_watchdog EXIT INT TERM
+
+      launch "${run_args[@]}" "$@" > "$AXON_LOG" 2>&1 &
       LAUNCH_PID=$!
+      tail -f "$AXON_LOG" &
+      TAIL_PID=$!
 
       (
         while kill -0 "$LAUNCH_PID" 2>/dev/null; do
@@ -406,13 +420,19 @@ case "$CMD" in
       ) &
       WATCHDOG_PID=$!
 
-      wait "$LAUNCH_PID" 2>/dev/null
-      RUN_EXIT=$?
-      kill "$WATCHDOG_PID" 2>/dev/null 2>&1
-      wait "$WATCHDOG_PID" 2>/dev/null 2>&1
+      wait "$LAUNCH_PID" || RUN_EXIT=$?
+      RUN_EXIT="${RUN_EXIT:-0}"
+      kill "$TAIL_PID" 2>/dev/null
+      kill "$WATCHDOG_PID" 2>/dev/null
+      wait "$TAIL_PID" 2>/dev/null || true
+      wait "$WATCHDOG_PID" 2>/dev/null || true
 
-      # If killed by watchdog (exit 137/143), try fallback profile
-      if [[ $RUN_EXIT -ge 128 ]]; then
+      # Check if watchdog fired (process was killed by signal, not user Ctrl-C)
+      if [[ $RUN_EXIT -eq 143 ]] && ! kill -0 "$LAUNCH_PID" 2>/dev/null; then
+        WATCHDOG_FIRED=true
+      fi
+
+      if [[ "$WATCHDOG_FIRED" == true ]]; then
         FALLBACK=""
         for pair in $FALLBACK_PROFILES; do
           FROM="${pair%%:*}"
@@ -426,7 +446,10 @@ case "$CMD" in
           FALLBACK_PROFILE="$ROOT/profiles/axon.${FALLBACK}.jsonc"
           if [[ -f "$FALLBACK_PROFILE" ]]; then
             echo "[watchdog] Failing over to profile: $FALLBACK" >&2
-            export OPENCODE_CONFIG_CONTENT="$(cat "$FALLBACK_PROFILE")"
+            PROFILE="$FALLBACK_PROFILE"
+            PROFILE_NAME="$FALLBACK"
+            trap - EXIT INT TERM
+            rm -f "$AXON_LOG"
             launch "${run_args[@]}" "$@"
             RUN_EXIT=$?
           fi
