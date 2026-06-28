@@ -5,12 +5,14 @@
 - upstream repo: `https://github.com/anomalyco/opencode`
 - upstream branch at import: `dev`
 - upstream commit at import: `1026791076c6a4edf1d44422177e13d06c2930d6`
-- upstream commit at last sync: `dfc0075f9` (2026-04-27, 40 commits ahead)
+- upstream commit at last sync: `ae53163ca` (2026-06-27, 59 commits ahead of previous sync)
 
 ## Local patches reapplied after sync
 
-1. **Qwen system message consolidation** (`llm.ts`) — joins multi-part system messages for non-Anthropic providers. Upstream still sends multiple system messages which breaks llama.cpp Qwen chat templates.
-2. **DeepSeek reasoning_content** — upstream now handles this via `interleaved: { field: "reasoning_content" }` in provider config (`738b3065d`), superseding our manual zod patch.
+1. **Skip npm install for local/dev builds** (`packages/opencode/src/config/config.ts`) — wraps `@opencode-ai/plugin` npm install in `if (!InstallationLocal)` guard. Prevents hangs when no network or proxy misconfiguration.
+2. **MCP tool argument sanitization** (`packages/opencode/src/mcp/catalog.ts`) — `sanitizeToolArgs()` truncates oversized model-generated tool arguments before passing to MCP servers. Prevents blowouts from hallucinated mega-args.
+3. **Kimi K2.6 reasoning field fallback** (`packages/core/src/github-copilot/chat/openai-compatible-chat-language-model.ts`) — adds `?? reasoning` fallback alongside Copilot's `reasoning_text`. Also adds `reasoning` to zod response/chunk schemas. File moved from `packages/opencode/src/provider/sdk/copilot/` to `packages/core/src/github-copilot/` in upstream commit `834515231`.
+4. **XML tool-call detection warning** (`packages/opencode/src/session/processor.ts`) — warns when model emits `<tool_call>` or `<arg_key>` XML in the text stream instead of using proper tool-calling. Uses `Effect.logWarning` (updated from old `log.warn` API).
 
 The outer `axon` repo also keeps an `opencode-upstream` remote so upstream changes can be inspected later without restoring the nested Git repository.
 
